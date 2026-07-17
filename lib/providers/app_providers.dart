@@ -33,8 +33,12 @@ final emulatorServiceProvider = Provider<EmulatorService>(
 final sdkDetectionServiceProvider = Provider<AndroidSdkDetectionService>(
   (ref) => AndroidSdkDetectionService(),
 );
-final startupServiceProvider = Provider<StartupService>((ref) => StartupService());
-final notificationServiceProvider = Provider<NotificationService>((ref) => NotificationService());
+final startupServiceProvider = Provider<StartupService>(
+  (ref) => StartupService(),
+);
+final notificationServiceProvider = Provider<NotificationService>(
+  (ref) => NotificationService(),
+);
 final trayServiceProvider = Provider<AppTrayService>((ref) => AppTrayService());
 
 final emulatorRepositoryProvider = Provider<EmulatorRepository>(
@@ -56,9 +60,11 @@ class SettingsController extends Notifier<AppSettings> {
     await ref.read(settingsServiceProvider).save(settings);
   }
 
-  Future<void> setSdkPath(String? path) => update(state.copyWith(sdkPath: path, clearSdkPath: path == null));
+  Future<void> setSdkPath(String? path) =>
+      update(state.copyWith(sdkPath: path, clearSdkPath: path == null));
 
-  Future<void> setThemeMode(ThemeMode mode) => update(state.copyWith(themeMode: mode));
+  Future<void> setThemeMode(ThemeMode mode) =>
+      update(state.copyWith(themeMode: mode));
 
   Future<void> setRefreshInterval(int seconds) {
     return update(state.copyWith(refreshIntervalSeconds: seconds.clamp(3, 60)));
@@ -84,20 +90,47 @@ class SettingsController extends Notifier<AppSettings> {
 }
 
 final emulatorControllerProvider =
-    AsyncNotifierProvider<EmulatorController, EmulatorState>(EmulatorController.new);
+    AsyncNotifierProvider<EmulatorController, EmulatorState>(
+      EmulatorController.new,
+    );
 
 class EmulatorState {
   const EmulatorState({
     required this.sdk,
     required this.emulators,
     this.message,
+    this.launching = const {},
+    this.stopping = const {},
   });
 
   final AndroidSdk? sdk;
   final List<Emulator> emulators;
   final String? message;
 
-  DashboardStatistics get statistics => DashboardStatistics.fromEmulators(emulators);
+  /// emulator names currently launching
+  final Set<String> launching;
+
+  /// emulator names currently stopping
+  final Set<String> stopping;
+
+  DashboardStatistics get statistics =>
+      DashboardStatistics.fromEmulators(emulators);
+
+  EmulatorState copyWith({
+    AndroidSdk? sdk,
+    List<Emulator>? emulators,
+    String? message,
+    Set<String>? launching,
+    Set<String>? stopping,
+  }) {
+    return EmulatorState(
+      sdk: sdk ?? this.sdk,
+      emulators: emulators ?? this.emulators,
+      message: message ?? this.message,
+      launching: launching ?? this.launching,
+      stopping: stopping ?? this.stopping,
+    );
+  }
 }
 
 class EmulatorController extends AsyncNotifier<EmulatorState> {
@@ -122,36 +155,73 @@ class EmulatorController extends AsyncNotifier<EmulatorState> {
       return const EmulatorState(
         sdk: null,
         emulators: <Emulator>[],
-        message: 'Android SDK was not found. Select the SDK folder in Settings.',
+        message:
+            'Android SDK was not found. Select the SDK folder in Settings.',
       );
     }
-    final emulators = await repository.listEmulators(sdk: sdk, settings: settings);
-    final message = emulators.isEmpty ? 'No Android Virtual Devices were found.' : null;
+    final emulators = await repository.listEmulators(
+      sdk: sdk,
+      settings: settings,
+    );
+    final message = emulators.isEmpty
+        ? 'No Android Virtual Devices were found.'
+        : null;
     return EmulatorState(sdk: sdk, emulators: emulators, message: message);
   }
 
   Future<void> refresh() async {
     state = const AsyncLoading<EmulatorState>();
-    state = await AsyncValue.guard(() => _load(ref.read(settingsControllerProvider)));
+    state = await AsyncValue.guard(
+      () => _load(ref.read(settingsControllerProvider)),
+    );
   }
 
   Future<void> refreshSilently() async {
     if (state.isLoading) {
       return;
     }
-    state = await AsyncValue.guard(() => _load(ref.read(settingsControllerProvider)));
+    state = await AsyncValue.guard(
+      () => _load(ref.read(settingsControllerProvider)),
+    );
   }
 
   Future<void> launch(Emulator emulator, {bool coldBoot = false}) async {
     final current = state.value;
-    final sdk = current?.sdk;
-    if (sdk == null) {
-      return;
+
+    if (current == null) return;
+
+    final sdk = current.sdk;
+
+    if (sdk == null) return;
+
+    // Add loading
+    state = AsyncData(
+      current.copyWith(launching: {...current.launching, emulator.name}),
+    );
+
+    try {
+      await ref
+          .read(emulatorRepositoryProvider)
+          .launch(sdk, emulator, coldBoot: coldBoot);
+
+      await ref
+          .read(settingsControllerProvider.notifier)
+          .markLaunched(emulator.name);
+
+      await ref
+          .read(notificationServiceProvider)
+          .show("Emulator Started", emulator.name);
+
+      await refreshSilently();
+    } finally {
+      final latest = state.value;
+
+      if (latest != null) {
+        final launching = {...latest.launching}..remove(emulator.name);
+
+        state = AsyncData(latest.copyWith(launching: launching));
+      }
     }
-    await ref.read(emulatorRepositoryProvider).launch(sdk, emulator, coldBoot: coldBoot);
-    await ref.read(settingsControllerProvider.notifier).markLaunched(emulator.name);
-    await ref.read(notificationServiceProvider).show('Emulator started', emulator.name);
-    await refreshSilently();
   }
 
   Future<void> stop(Emulator emulator) async {
@@ -161,7 +231,9 @@ class EmulatorController extends AsyncNotifier<EmulatorState> {
       return;
     }
     await ref.read(emulatorRepositoryProvider).stop(sdk, emulator);
-    await ref.read(notificationServiceProvider).show('Emulator stopped', emulator.name);
+    await ref
+        .read(notificationServiceProvider)
+        .show('Emulator stopped', emulator.name);
     await refreshSilently();
   }
 }

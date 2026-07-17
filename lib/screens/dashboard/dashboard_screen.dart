@@ -97,6 +97,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       final emulator = emulators[index];
                       return EmulatorCard(
                         emulator: emulator,
+                        isLaunching: data.launching.contains(emulator.name),
                         onFavorite: () => ref
                             .read(settingsControllerProvider.notifier)
                             .toggleFavorite(emulator.name),

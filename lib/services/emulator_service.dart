@@ -42,7 +42,6 @@ class EmulatorLaunchOptions {
 
 class EmulatorService {
   EmulatorService(this._adbService);
-
   final AdbService _adbService;
 
   Future<List<Emulator>> listAvds({
@@ -84,8 +83,43 @@ class EmulatorService {
     required String name,
     EmulatorLaunchOptions options = const EmulatorLaunchOptions(),
   }) async {
-    await Process.start(emulatorPath, options.toArguments(name), mode: ProcessStartMode.detached);
+    final args = options.toArguments(name);
+
+    if (Platform.isWindows) {
+      await _launchHiddenWindows(emulatorPath, args);
+    } else {
+      await Process.start(emulatorPath, args, mode: ProcessStartMode.detached);
+    }
   }
+  Future<void> _launchHiddenWindows(String executable, List<String> arguments) async {
+    // for hide cmd use the wscript.exe for background process run :
+    final tempDir = Directory.systemTemp.createTempSync('emulator_launch_');
+    final vbsFile = File(p.join(tempDir.path, 'run_hidden.vbs'));
+
+    final argsString = arguments.map((arg) => '"${arg.replaceAll('"', '""')}"').join(' ');
+    final command = '"$executable" $argsString';
+    final escapedCommand = command.replaceAll('"', '""');
+
+    final vbsContent = 'CreateObject("Wscript.Shell").Run "$escapedCommand", 0, False';
+    vbsFile.writeAsStringSync(vbsContent);
+
+    await Process.start('wscript.exe', [vbsFile.path]);
+
+
+    Future.delayed(const Duration(seconds: 2), () {
+      try {
+        if (vbsFile.existsSync()) {
+          vbsFile.deleteSync();
+        }
+        if (tempDir.existsSync()) {
+          tempDir.deleteSync();
+        }
+      } catch (_) {
+
+      }
+    });
+  }
+
 
   Future<void> stop({
     required String adbPath,
