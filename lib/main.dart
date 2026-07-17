@@ -16,11 +16,10 @@ Future<void> main() async {
   if (Platform.isWindows) {
     await windowManager.ensureInitialized();
     const windowOptions = WindowOptions(
-      size: Size(1200, 650),
-      minimumSize: Size(1200, 650),
-      maximumSize: Size(1200, 650),
+      size: Size(900, 550),
+      minimumSize: Size(900, 550),
+      maximumSize: Size(900, 550),
       center: true,
-      // এখানে কালার পরিবর্তন করুন যাতে উইন্ডো লোড হওয়ার সময় সাদা ফ্ল্যাশ না মারে
       backgroundColor: Colors.transparent,
       skipTaskbar: false,
       titleBarStyle: TitleBarStyle.hidden,
@@ -28,7 +27,6 @@ Future<void> main() async {
     await windowManager.waitUntilReadyToShow(windowOptions, () async {
       await windowManager.setResizable(false);
       await windowManager.setMaximizable(false);
-      // এই লাইনটি নেটিভ উইন্ডোজ টাইটেল বারের সাদা ব্যাকগ্রাউন্ড মাস্ক সরিয়ে দেয়
       await windowManager.setHasShadow(true);
       await windowManager.show();
       await windowManager.focus();
