@@ -17,6 +17,7 @@ import '../services/notification_service.dart';
 import '../services/settings_service.dart';
 import '../services/startup_service.dart';
 import '../services/tray_service.dart';
+import '../services/update_service.dart';
 
 final sharedPreferencesProvider = Provider<SharedPreferences>(
   (ref) => throw UnimplementedError('SharedPreferences must be overridden.'),
@@ -92,6 +93,13 @@ class SettingsController extends Notifier<AppSettings> {
     return update(state.copyWith(lastLaunchByName: launches));
   }
 }
+
+final updateServiceProvider = Provider((ref) => UpdateService());
+
+final updateCheckProvider = FutureProvider<UpdateInfo?>((ref) async {
+  final service = ref.read(updateServiceProvider);
+  return service.checkForUpdate();
+});
 
 final emulatorControllerProvider =
     AsyncNotifierProvider<EmulatorController, EmulatorState>(

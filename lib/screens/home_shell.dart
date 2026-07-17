@@ -3,9 +3,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:window_manager/window_manager.dart';
 import '../core/constants/app_constants.dart';
 import '../providers/app_providers.dart';
+import '../services/update_service.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'logs/logs_screen.dart';
 import 'settings/settings_screen.dart';
@@ -123,7 +125,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
   }
 }
 
-class AppSidebar extends StatelessWidget {
+class AppSidebar extends ConsumerWidget {
   const AppSidebar({
     super.key,
     required this.selectedIndex,
@@ -152,7 +154,7 @@ class AppSidebar extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
@@ -175,11 +177,138 @@ class AppSidebar extends StatelessWidget {
               },
             ),
           ),
+
+          const VersionUpdateTile(),
+          const SizedBox(height: 12),
         ],
       ),
     );
   }
 }
+
+class VersionUpdateTile extends ConsumerStatefulWidget {
+  const VersionUpdateTile({super.key});
+
+  @override
+  ConsumerState<VersionUpdateTile> createState() => _VersionUpdateTileState();
+}
+
+class _VersionUpdateTileState extends ConsumerState<VersionUpdateTile> {
+  String _currentVersion = "";
+  bool _downloading = false;
+  double _progress = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    setState(() => _currentVersion = info.version);
+  }
+
+  Future<void> _handleUpdate(UpdateInfo update) async {
+    final service = ref.read(updateServiceProvider);
+
+    setState(() {
+      _downloading = true;
+      _progress = 0;
+    });
+
+    try {
+      final path = await service.downloadInstaller(
+        update.downloadUrl,
+        onProgress: (p) => setState(() => _progress = p),
+      );
+      await service.runInstallerAndExit(path);
+    } catch (e) {
+      setState(() => _downloading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Update failed: $e")),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final updateAsync = ref.watch(updateCheckProvider);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "v$_currentVersion",
+            style: TextStyle(
+              fontSize: 11,
+              color: colorScheme.onSurfaceVariant.withOpacity(.6),
+            ),
+          ),
+          const SizedBox(height: 6),
+
+          updateAsync.when(
+            data: (update) {
+              if (update == null) return const SizedBox.shrink();
+
+              if (_downloading) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    LinearProgressIndicator(value: _progress),
+                    const SizedBox(height: 4),
+                    Text(
+                      "${(_progress * 100).toStringAsFixed(0)}%",
+                      style: const TextStyle(fontSize: 10),
+                    ),
+                  ],
+                );
+              }
+
+              return GestureDetector(
+                onTap: () => _handleUpdate(update),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withOpacity(.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.system_update_alt,
+                          size: 14, color: colorScheme.primary),
+                      const SizedBox(width: 6),
+                      Text(
+                        "Update to v${update.latestVersion}",
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 
 class SidebarTile extends StatefulWidget {
   const SidebarTile({

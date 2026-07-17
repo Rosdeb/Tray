@@ -45,6 +45,8 @@ dependencies:
   window_manager: ^0.5.1
   iconsax_flutter: ^1.0.1
   flutter_advanced_switch: ^3.2.1
+  package_info_plus: ^8.0.2
+  http: ^1.2.2
 
 dev_dependencies:
   flutter_test:
