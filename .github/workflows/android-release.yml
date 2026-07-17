@@ -32,19 +32,52 @@ jobs:
       - name: Build Windows
         run: flutter build windows --release
 
-      - name: Zip Windows Release
-        shell: powershell
+      - name: Create Inno Setup Script
+        shell: bash
         run: |
-          Compress-Archive `
-            -Path build/windows/x64/runner/Release/* `
-            -DestinationPath Tray-Windows.zip
+          cat > installer.iss << 'EOF'
+          #define MyAppName "Tray"
+          #define MyAppExeName "tray.exe"
+          #define MyAppPublisher "YourCompanyName"
+
+          [Setup]
+          AppId={{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
+          AppName={#MyAppName}
+          AppVersion=1.0.0
+          AppPublisher={#MyAppPublisher}
+          DefaultDirName={autopf}\{#MyAppName}
+          DefaultGroupName={#MyAppName}
+          UninstallDisplayIcon={app}\{#MyAppExeName}
+          Compression=lzma2
+          SolidCompression=yes
+          OutputDir=Output
+          OutputBaseFilename=Tray-Setup
+          ArchitecturesInstallIn64BitMode=x64
+
+          [Files]
+          Source: "build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs
+
+          [Icons]
+          Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+          Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+
+          [Run]
+          Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
+          EOF
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+
+      - name: Build Installer
+        shell: cmd
+        run: |
+          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
 
       - name: Upload Windows Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            build/windows/x64/runner/Release/tray.exe
-            Tray-Windows.zip
+            Output/Tray-Setup.exe
 
   ##################################
   ## macOS
