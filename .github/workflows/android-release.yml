@@ -32,30 +32,19 @@ jobs:
       - name: Build Windows
         run: flutter build windows --release
 
-      - name: List Release Folder
+      - name: Zip Windows Release
         shell: powershell
         run: |
-          Write-Host "===== Release Folder ====="
-          Get-ChildItem build/windows/x64/runner/Release -Recurse
+          Compress-Archive `
+            -Path build/windows/x64/runner/Release/* `
+            -DestinationPath Tray-Windows.zip
 
-      - name: Find EXE
-        id: find_exe
-        shell: powershell
-        run: |
-          $exe = Get-ChildItem build/windows/x64/runner/Release -Filter *.exe -Recurse | Select-Object -First 1
-
-          if ($null -eq $exe) {
-            Write-Error "No EXE file found!"
-            exit 1
-          }
-
-          Write-Host "Found EXE: $($exe.FullName)"
-          echo "exe_path=$($exe.FullName)" >> $env:GITHUB_OUTPUT
-
-      - name: Upload EXE to Release
+      - name: Upload Windows Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.find_exe.outputs.exe_path }}
+          files: |
+            build/windows/x64/runner/Release/tray.exe
+            Tray-Windows.zip
 
   ##################################
   ## macOS
