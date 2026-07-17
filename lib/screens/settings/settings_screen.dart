@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/app_providers.dart';
+import '../../widgets/settingSwitchTile.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -68,28 +69,31 @@ class SettingsScreen extends ConsumerWidget {
         const SizedBox(height: 18),
         _Section(
           title: 'Behavior',
-          children: <Widget>[
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
+          children: [
+            const SizedBox(height: 18),
+            SettingSwitchTile(
+              title: 'Start with Windows',
+              subtitle: 'Launch automatically when Windows starts.',
               value: settings.startWithWindows,
-              title: const Text('Start with Windows'),
-              subtitle: const Text('Persisted setting; installer registry wiring can be enabled during packaging.'),
               onChanged: controller.setStartWithWindows,
             ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
+            const SizedBox(height: 12),
+            SettingSwitchTile(
+              title: 'Notifications',
+              subtitle: 'Show desktop notifications.',
               value: settings.notificationsEnabled,
-              title: const Text('Notifications'),
-              subtitle: const Text('Show launch and stop notifications when native toast support is configured.'),
-              onChanged: (value) => controller.update(settings.copyWith(notificationsEnabled: value)),
+              onChanged: (value) =>
+                  controller.update(settings.copyWith(notificationsEnabled: value)),
             ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
+            const SizedBox(height: 12),
+            SettingSwitchTile(
+              title: 'Minimize to tray',
+              subtitle: 'Closing the window hides it in the system tray.',
               value: settings.minimizeToTray,
-              title: const Text('Close button minimizes to tray'),
-              subtitle: const Text('Use the tray Exit command to quit the app.'),
-              onChanged: (value) => controller.update(settings.copyWith(minimizeToTray: value)),
+              onChanged: (value) =>
+                  controller.update(settings.copyWith(minimizeToTray: value)),
             ),
+            const SizedBox(height: 18),
           ],
         ),
         const SizedBox(height: 18),

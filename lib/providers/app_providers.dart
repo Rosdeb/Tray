@@ -22,6 +22,10 @@ final sharedPreferencesProvider = Provider<SharedPreferences>(
   (ref) => throw UnimplementedError('SharedPreferences must be overridden.'),
 );
 
+final Set<String> _launching = {};
+
+bool isLaunching(String name) => _launching.contains(name);
+
 final appLoggerProvider = Provider<AppLogger>((ref) => AppLogger());
 final settingsServiceProvider = Provider<SettingsService>(
   (ref) => SettingsService(ref.watch(sharedPreferencesProvider)),
@@ -187,43 +191,48 @@ class EmulatorController extends AsyncNotifier<EmulatorState> {
 
   Future<void> launch(Emulator emulator, {bool coldBoot = false}) async {
     final current = state.value;
-
     if (current == null) return;
 
-    final sdk = current.sdk;
+    if (current.launching.contains(emulator.name)) {
+      return;
+    }
 
-    if (sdk == null) return;
-
-    // Add loading
     state = AsyncData(
-      current.copyWith(launching: {...current.launching, emulator.name}),
+      current.copyWith(
+        launching: {...current.launching, emulator.name},
+      ),
     );
 
     try {
-      await ref
-          .read(emulatorRepositoryProvider)
-          .launch(sdk, emulator, coldBoot: coldBoot);
+      final sdk = current.sdk;
+      if (sdk == null) return;
 
-      await ref
-          .read(settingsControllerProvider.notifier)
+      await ref.read(emulatorRepositoryProvider).launch(
+        sdk,
+        emulator,
+        coldBoot: coldBoot,
+      );
+
+      await ref.read(settingsControllerProvider.notifier)
           .markLaunched(emulator.name);
 
-      await ref
-          .read(notificationServiceProvider)
-          .show("Emulator Started", emulator.name);
+      await ref.read(notificationServiceProvider)
+          .show('Emulator started', emulator.name);
 
       await refreshSilently();
     } finally {
       final latest = state.value;
-
       if (latest != null) {
-        final launching = {...latest.launching}..remove(emulator.name);
+        final launching = {...latest.launching};
+        launching.remove(emulator.name);
 
-        state = AsyncData(latest.copyWith(launching: launching));
+        state = AsyncData(
+          latest.copyWith(launching: launching),
+        );
       }
     }
   }
-
+  
   Future<void> stop(Emulator emulator) async {
     final current = state.value;
     final sdk = current?.sdk;

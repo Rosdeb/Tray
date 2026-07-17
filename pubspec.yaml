@@ -43,6 +43,7 @@ dependencies:
   win32: ^5.14.0
   window_manager: ^0.5.1
   iconsax_flutter: ^1.0.1
+  flutter_advanced_switch: ^3.2.1
 
 dev_dependencies:
   flutter_test:
