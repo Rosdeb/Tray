@@ -31,18 +31,15 @@ jobs:
 
       - run: flutter build windows --release
 
-      - name: Zip Windows Build
+      - name: List Release Files
         shell: powershell
         run: |
-          Compress-Archive `
-            -Path build/windows/x64/runner/Release/* `
-            -DestinationPath Windows.zip
+          Get-ChildItem build/windows/x64/runner/Release
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: |
-            Windows.zip
-            build/windows/x64/runner/Release/YourApp.exe
+          files: build/windows/x64/runner/Release/MyApp.exe  
+          
             
 
 
