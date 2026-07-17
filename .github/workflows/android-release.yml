@@ -1,28 +1,29 @@
-name: Windows Release
+name: Release
 
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
+  ##################################
+  ## Windows
+  ##################################
   windows:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.44.4'
+          flutter-version: "3.44.4"
 
-      - name: Flutter Pub Get
+      - name: Get dependencies
         run: flutter pub get
 
       - name: Enable Windows Desktop
@@ -31,27 +32,34 @@ jobs:
       - name: Build Windows
         run: flutter build windows --release
 
-      - name: Show Release Folder
-        shell: pwsh
+      - name: List Release Folder
+        shell: powershell
         run: |
+          Write-Host "===== Release Folder ====="
           Get-ChildItem build/windows/x64/runner/Release -Recurse
 
-      - name: Upload Build Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-release
-          path: build/windows/x64/runner/Release
+      - name: Find EXE
+        id: find_exe
+        shell: powershell
+        run: |
+          $exe = Get-ChildItem build/windows/x64/runner/Release -Filter *.exe -Recurse | Select-Object -First 1
 
-      - name: Upload EXE to GitHub Release
+          if ($null -eq $exe) {
+            Write-Error "No EXE file found!"
+            exit 1
+          }
+
+          Write-Host "Found EXE: $($exe.FullName)"
+          echo "exe_path=$($exe.FullName)" >> $env:GITHUB_OUTPUT
+
+      - name: Upload EXE to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: build/windows/x64/runner/Release/*.exe
+          files: ${{ steps.find_exe.outputs.exe_path }}
 
-          
   ##################################
   ## macOS
   ##################################
-
   macos:
     runs-on: macos-latest
 
@@ -75,7 +83,6 @@ jobs:
       - name: Build DMG
         run: |
           mkdir dmg
-
           cp -R build/macos/Build/Products/Release/*.app dmg/
 
           create-dmg \
