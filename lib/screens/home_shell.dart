@@ -41,9 +41,11 @@ class _HomeShellState extends ConsumerState<HomeShell>
           ref.read(emulatorControllerProvider.notifier).refresh(),
       onExit: () async {
         _allowClose = true;
-        if (Platform.isWindows) {
-          await windowManager.destroy();
-        }
+        await windowManager.destroy();
+      },
+      onCheckUpdate: () async {
+        ref.invalidate(updateCheckProvider);
+        await ref.read(updateCheckProvider.future);
       },
     );
   }
