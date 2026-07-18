@@ -19,12 +19,14 @@ class AppTrayService with TrayListener, WindowListener {
     trayManager.addListener(this);
 
     try {
-      final file = File("windows/runner/resources/app_icon.ico");
-      print("Exists: ${file.existsSync()}");
-      print("Path: ${file.absolute.path}");
 
-      await trayManager.setIcon(file.path);
+      final icon = await rootBundle.load("assets/icons/app_icon.ico");
+
+      final temp = File("${Directory.systemTemp.path}/app_icon.ico");
       print("Icon loaded");
+      await temp.writeAsBytes(icon.buffer.asUint8List());
+
+      await trayManager.setIcon(temp.path);
 
       await trayManager.setToolTip("Android Emulator Manager");
       print("Tooltip set");

@@ -255,7 +255,38 @@ class _VersionUpdateTileState extends ConsumerState<VersionUpdateTile> {
 
           updateAsync.when(
             data: (update) {
-              if (update == null) return const SizedBox.shrink();
+              // Already latest version
+              if (update == null) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(
+                        Icons.check_circle,
+                        size: 14,
+                        color: Colors.green,
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        "Already up to date",
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
 
               if (_downloading) {
                 return Column(
@@ -285,8 +316,11 @@ class _VersionUpdateTileState extends ConsumerState<VersionUpdateTile> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.system_update_alt,
-                          size: 14, color: colorScheme.primary),
+                      Icon(
+                        Icons.system_update_alt,
+                        size: 14,
+                        color: colorScheme.primary,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         "Update to v${update.latestVersion}",
@@ -303,7 +337,8 @@ class _VersionUpdateTileState extends ConsumerState<VersionUpdateTile> {
             },
             loading: () => const SizedBox.shrink(),
             error: (_, __) => const SizedBox.shrink(),
-          ),
+          )
+
         ],
       ),
     );
