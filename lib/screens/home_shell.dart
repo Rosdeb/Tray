@@ -96,7 +96,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
 
           VerticalDivider(
             width: 1,
-            color: Theme.of(context).dividerColor,
+            color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
           ),
 
           Expanded(
@@ -160,12 +160,28 @@ class AppSidebar extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
-      width: 180,
+      width: 160,
       color: colorScheme.surface,
       child: Column(
         children: [
-          const SizedBox(height: 24),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const SizedBox(width: 12),
+              Image.asset("assets/icons/tray.png",height: 40,width: 50,),
+              const SizedBox(width: 12),
+              Text(
+                "Tray",
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 3),
+                ),
+              ),
+            ],
+          ),
 
+          const SizedBox(height: 18),
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 10),
