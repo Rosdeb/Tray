@@ -55,6 +55,8 @@ class SettingsScreen extends ConsumerWidget {
         _Section(
           title: 'Appearance',
           children: <Widget>[
+            const SizedBox(height: 18),
+
             SegmentedButton<ThemeMode>(
               segments: const <ButtonSegment<ThemeMode>>[
                 ButtonSegment(value: ThemeMode.system, label: Text('System'), icon: Icon(Icons.brightness_auto)),

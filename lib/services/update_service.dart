@@ -81,13 +81,19 @@ class UpdateService {
     final tempDir = await getTemporaryDirectory();
     final filePath = "${tempDir.path}\\Tray-Setup.exe";
 
+    final file = File(filePath);
+
+    // Already downloaded
+    if (await file.exists()) {
+      return filePath;
+    }
+
     final request = http.Request("GET", Uri.parse(url));
     final response = await http.Client().send(request);
 
     final total = response.contentLength ?? 0;
     int received = 0;
 
-    final file = File(filePath);
     final sink = file.openWrite();
 
     await response.stream.listen((chunk) {

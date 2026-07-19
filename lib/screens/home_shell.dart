@@ -41,9 +41,11 @@ class _HomeShellState extends ConsumerState<HomeShell>
           ref.read(emulatorControllerProvider.notifier).refresh(),
       onExit: () async {
         _allowClose = true;
-        if (Platform.isWindows) {
-          await windowManager.destroy();
-        }
+        await windowManager.destroy();
+      },
+      onCheckUpdate: () async {
+        ref.invalidate(updateCheckProvider);
+        await ref.read(updateCheckProvider.future);
       },
     );
   }
@@ -94,7 +96,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
 
           VerticalDivider(
             width: 1,
-            color: Theme.of(context).dividerColor,
+            color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
           ),
 
           Expanded(
@@ -158,12 +160,28 @@ class AppSidebar extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
-      width: 180,
+      width: 160,
       color: colorScheme.surface,
       child: Column(
         children: [
-          const SizedBox(height: 24),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const SizedBox(width: 12),
+              Image.asset("assets/icons/tray.png",height: 40,width: 50,color: colorScheme.onSurfaceVariant.withValues(alpha: 4),),
+              const SizedBox(width: 12),
+              Text(
+                "Tray",
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 3),
+                ),
+              ),
+            ],
+          ),
 
+          const SizedBox(height: 18),
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -241,11 +259,52 @@ class _VersionUpdateTileState extends ConsumerState<VersionUpdateTile> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text(
+            "V$_currentVersion",
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.9),
+            ),
+          ),
+          const SizedBox(height: 6),
+
           updateAsync.when(
             data: (update) {
-              if (update == null) return const SizedBox.shrink();
+              // Already latest version
+              if (update == null) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(
+                        Icons.check_circle,
+                        size: 14,
+                        color: Colors.green,
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        "Already up to date",
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
 
               if (_downloading) {
                 return Column(
@@ -275,8 +334,11 @@ class _VersionUpdateTileState extends ConsumerState<VersionUpdateTile> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.system_update_alt,
-                          size: 14, color: colorScheme.primary),
+                      Icon(
+                        Icons.system_update_alt,
+                        size: 14,
+                        color: colorScheme.primary,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         "Update to v${update.latestVersion}",
@@ -293,7 +355,8 @@ class _VersionUpdateTileState extends ConsumerState<VersionUpdateTile> {
             },
             loading: () => const SizedBox.shrink(),
             error: (_, __) => const SizedBox.shrink(),
-          ),
+          )
+
         ],
       ),
     );
