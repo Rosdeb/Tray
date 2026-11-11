@@ -4,10 +4,12 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../core/utils/platform_paths.dart';
 import '../../providers/app_providers.dart';
 import '../../services/system_environment_service.dart';
+import '../../services/update_service.dart';
 import '../../widgets/process_manager_section.dart';
 import '../../widgets/scrcpy_install_dialog.dart';
 import '../../widgets/sdk_setup_dialog.dart';
@@ -757,17 +759,213 @@ class SettingsScreen extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: 18),
-        _Section(
-          title: 'About AEM',
-          children: const <Widget>[
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(CupertinoIcons.info_circle),
-              title: Text('Android Emulator Manager (AEM)'),
-              subtitle: Text('Autonomous Android Emulator and Environment Manager. No Android Studio required.'),
+        const _UpdateSettingsSection(),
+      ],
+    );
+  }
+}
+
+class _UpdateSettingsSection extends ConsumerStatefulWidget {
+  const _UpdateSettingsSection();
+
+  @override
+  ConsumerState<_UpdateSettingsSection> createState() => _UpdateSettingsSectionState();
+}
+
+class _UpdateSettingsSectionState extends ConsumerState<_UpdateSettingsSection> {
+  String _currentVersion = "";
+  bool _checking = false;
+  bool _downloading = false;
+  double _progress = 0;
+  UpdateCheckResult? _lastResult;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() => _currentVersion = info.version);
+    }
+  }
+
+  Future<void> _checkUpdate() async {
+    setState(() {
+      _checking = true;
+      _lastResult = null;
+    });
+    try {
+      ref.invalidate(updateCheckProvider);
+      final res = await ref.read(updateServiceProvider).checkUpdateWithDetails();
+      if (mounted) {
+        setState(() {
+          _lastResult = res;
+          _checking = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _lastResult = UpdateCheckResult(isUpToDate: false, error: e.toString());
+          _checking = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _startUpdate(UpdateInfo update) async {
+    setState(() {
+      _downloading = true;
+      _progress = 0;
+    });
+    try {
+      final service = ref.read(updateServiceProvider);
+      final path = await service.downloadInstaller(
+        update.downloadUrl,
+        onProgress: (p) => setState(() => _progress = p),
+      );
+      await service.runInstallerAndExit(path);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _downloading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Installation failed: $e")),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final cachedUpdate = ref.watch(updateCheckProvider).value;
+
+    final result = _lastResult;
+    final hasUpdate = result?.hasUpdate ?? (cachedUpdate != null);
+    final updateInfo = result?.updateInfo ?? cachedUpdate;
+
+    return _Section(
+      title: 'Application Updates & About',
+      children: <Widget>[
+        const SizedBox(height: 8),
+        Row(
+          children: <Widget>[
+            const Icon(CupertinoIcons.info_circle, size: 28),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    'Simulation Tray (AEM)',
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _currentVersion.isNotEmpty
+                        ? 'Installed Version: v$_currentVersion'
+                        : 'Autonomous Android Environment & Device Manager',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
+              ),
             ),
+            if (!_downloading)
+              FilledButton.tonalIcon(
+                onPressed: _checking ? null : _checkUpdate,
+                icon: _checking
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(CupertinoIcons.arrow_clockwise, size: 16),
+                label: Text(_checking ? 'Checking...' : 'Check for Updates'),
+              ),
           ],
         ),
+        if (_downloading) ...[
+          const SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(value: _progress),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Downloading update: ${(_progress * 100).toStringAsFixed(0)}%',
+            style: theme.textTheme.bodySmall,
+          ),
+        ] else if (hasUpdate && updateInfo != null) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: <Widget>[
+                Icon(CupertinoIcons.arrow_down_circle_fill, color: colorScheme.primary, size: 24),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'New Version Available: v${updateInfo.latestVersion}',
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.primary),
+                      ),
+                      if (updateInfo.releaseNotes.isNotEmpty)
+                        Text(
+                          updateInfo.releaseNotes,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                FilledButton.icon(
+                  onPressed: () => _startUpdate(updateInfo),
+                  icon: const Icon(CupertinoIcons.arrow_down_to_line, size: 16),
+                  label: const Text('Update Now'),
+                ),
+              ],
+            ),
+          ),
+        ] else if (result != null && result.isUpToDate) ...[
+          const SizedBox(height: 12),
+          Row(
+            children: <Widget>[
+              const Icon(CupertinoIcons.checkmark_circle_fill, color: Colors.green, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                'Simulation Tray is up to date (v${result.currentVersion}).',
+                style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w600, fontSize: 13),
+              ),
+            ],
+          ),
+        ] else if (result != null && result.hasError) ...[
+          const SizedBox(height: 12),
+          Row(
+            children: <Widget>[
+              const Icon(CupertinoIcons.exclamationmark_triangle_fill, color: Colors.orange, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Update check failed: ${result.error}',
+                  style: const TextStyle(color: Colors.orange, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }

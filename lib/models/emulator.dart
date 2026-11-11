@@ -49,6 +49,16 @@ class Emulator {
   bool get isBooting => status == EmulatorStatus.booting;
   bool get isUnauthorized => status == EmulatorStatus.unauthorized;
 
+  String get displayName {
+    if (isPhysical) {
+      if (manufacturer != null && model != null && !model!.toLowerCase().contains(manufacturer!.toLowerCase())) {
+        return '$manufacturer $model';
+      }
+      return model ?? name;
+    }
+    return name.replaceAll('_', ' ');
+  }
+
   Emulator copyWith({
     String? name,
     String? androidVersion,

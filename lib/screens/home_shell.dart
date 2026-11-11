@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:window_manager/window_manager.dart';
+import '../models/emulator.dart';
 import '../providers/app_providers.dart';
 import '../services/tray_service.dart';
 import '../services/update_service.dart';
@@ -47,11 +48,82 @@ class _HomeShellState extends ConsumerState<HomeShell>
         _allowClose = true;
         await windowManager.destroy();
       },
-      onCheckUpdate: () async {
-        ref.invalidate(updateCheckProvider);
-        await ref.read(updateCheckProvider.future);
+      onCheckUpdate: () => _handleManualUpdateCheck(),
+      onOpenManager: () async {
+        await windowManager.show();
+        await windowManager.focus();
+      },
+      onLaunchEmulator: (name, {bool coldBoot = false}) async {
+        final emus = ref.read(emulatorControllerProvider).value?.emulators ?? [];
+        final target = emus.firstWhere(
+          (e) => e.name == name,
+          orElse: () => Emulator(name: name, status: EmulatorStatus.offline),
+        );
+        await ref.read(emulatorControllerProvider.notifier).launch(target, coldBoot: coldBoot);
+      },
+      onStopEmulator: (name) async {
+        final emus = ref.read(emulatorControllerProvider).value?.emulators ?? [];
+        final target = emus.firstWhere(
+          (e) => e.name == name,
+          orElse: () => Emulator(name: name, status: EmulatorStatus.running),
+        );
+        await ref.read(emulatorControllerProvider.notifier).stop(target);
+      },
+      onMirrorEmulator: (name) async {
+        final emus = ref.read(emulatorControllerProvider).value?.emulators ?? [];
+        final target = emus.firstWhere(
+          (e) => e.name == name,
+          orElse: () => Emulator(name: name, status: EmulatorStatus.running),
+        );
+        await ref.read(emulatorControllerProvider.notifier).mirrorWithScrcpy(target);
+      },
+      onMirrorPhysical: (serial) async {
+        final emus = ref.read(emulatorControllerProvider).value?.emulators ?? [];
+        final target = emus.firstWhere(
+          (e) => e.serial == serial || e.name == serial,
+          orElse: () => Emulator(name: serial, serial: serial, isPhysical: true, status: EmulatorStatus.running),
+        );
+        await ref.read(emulatorControllerProvider.notifier).mirrorWithScrcpy(target);
       },
     );
+
+    final current = ref.read(emulatorControllerProvider).value;
+    if (current != null) {
+      await _trayService.updateMenu(
+        emulators: current.emulators,
+        booting: current.booting,
+        stopping: current.stopping,
+      );
+    }
+  }
+
+  Future<void> _handleManualUpdateCheck() async {
+    final notify = ref.read(notificationServiceProvider);
+    await notify.show("Simulation Tray", "Checking for updates...");
+
+    ref.invalidate(updateCheckProvider);
+    final result = await ref.read(updateServiceProvider).checkUpdateWithDetails();
+
+    if (result.hasUpdate && result.updateInfo != null) {
+      await notify.show(
+        "Update Available!",
+        "Version v${result.updateInfo!.latestVersion} is ready to download. Open Simulation Tray to update.",
+      );
+      if (mounted) {
+        await windowManager.show();
+        await windowManager.focus();
+      }
+    } else if (result.isUpToDate) {
+      await notify.show(
+        "Up to Date",
+        "Simulation Tray v${result.currentVersion} is the latest version.",
+      );
+    } else if (result.hasError) {
+      await notify.show(
+        "Update Check Failed",
+        result.error ?? "Could not reach update server.",
+      );
+    }
   }
 
   @override
@@ -80,6 +152,17 @@ class _HomeShellState extends ConsumerState<HomeShell>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AsyncValue<EmulatorState>>(emulatorControllerProvider, (prev, next) {
+      final state = next.value;
+      if (state != null) {
+        _trayService.updateMenu(
+          emulators: state.emulators,
+          booting: state.booting,
+          stopping: state.stopping,
+        );
+      }
+    });
+
     final pages = [
       const DashboardScreen(),
       const MonitorScreen(),
@@ -224,6 +307,7 @@ class VersionUpdateTile extends ConsumerStatefulWidget {
 class _VersionUpdateTileState extends ConsumerState<VersionUpdateTile> {
   String _currentVersion = "";
   bool _downloading = false;
+  bool _checking = false;
   double _progress = 0;
 
   @override
@@ -235,6 +319,37 @@ class _VersionUpdateTileState extends ConsumerState<VersionUpdateTile> {
   Future<void> _loadVersion() async {
     final info = await PackageInfo.fromPlatform();
     setState(() => _currentVersion = info.version);
+  }
+
+  Future<void> _manualCheck() async {
+    if (_checking || _downloading) return;
+    setState(() => _checking = true);
+    try {
+      ref.invalidate(updateCheckProvider);
+      final result = await ref.read(updateServiceProvider).checkUpdateWithDetails();
+      if (!mounted) return;
+      if (result.hasUpdate && result.updateInfo != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Update available: v${result.updateInfo!.latestVersion}"),
+            action: SnackBarAction(
+              label: "Install",
+              onPressed: () => _handleUpdate(result.updateInfo!),
+            ),
+          ),
+        );
+      } else if (result.isUpToDate) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Simulation Tray v${result.currentVersion} is up to date!")),
+        );
+      } else if (result.hasError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Update check failed: ${result.error}")),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
   }
 
   Future<void> _handleUpdate(UpdateInfo update) async {
@@ -271,38 +386,54 @@ class _VersionUpdateTileState extends ConsumerState<VersionUpdateTile> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
           updateAsync.when(
             data: (update) {
               // Already latest version
               if (update == null) {
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: .12),
+                return Tooltip(
+                  message: "Click to check for updates",
+                  child: InkWell(
                     borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        CupertinoIcons.checkmark_circle_fill,
-                        size: 14,
-                        color: Colors.green,
+                    onTap: _manualCheck,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        _currentVersion.isEmpty ? "Up to date" : "v$_currentVersion (Latest)",
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.green,
-                        ),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: .12),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    ],
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _checking
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.green),
+                                )
+                              : const Icon(
+                                  CupertinoIcons.checkmark_circle_fill,
+                                  size: 14,
+                                  color: Colors.green,
+                                ),
+                          const SizedBox(width: 6),
+                          Text(
+                            _checking
+                                ? "Checking..."
+                                : _currentVersion.isEmpty
+                                    ? "Up to date"
+                                    : "v$_currentVersion (Latest)",
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 );
               }
