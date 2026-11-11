@@ -213,7 +213,7 @@ class UpdateService {
     if (Platform.isWindows) {
       await Process.start(
         installerPath,
-        [],
+        ['/CLOSEAPPLICATIONS'],
         mode: ProcessStartMode.detached,
       );
     } else if (Platform.isMacOS) {

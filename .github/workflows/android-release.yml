@@ -53,9 +53,13 @@ jobs:
           OutputDir=Output
           OutputBaseFilename=Tray-Setup
           ArchitecturesInstallIn64BitMode=x64
+          CloseApplications=force
+          RestartApplications=no
+          PrivilegesRequired=lowest
+          PrivilegesRequiredOverridesAllowed=dialog
 
           [Files]
-          Source: "build\\windows\\x64\\runner\\Release\\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs
+          Source: "build\\windows\\x64\\runner\\Release\\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
           [Icons]
           Name: "{group}\\{#MyAppName}"; Filename: "{app}\\{#MyAppExeName}"
@@ -73,11 +77,18 @@ jobs:
         run: |
           "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
 
+      - name: Generate Windows Checksums
+        shell: bash
+        run: |
+          cd Output
+          sha256sum Tray-Setup.exe > Tray-Setup.exe.sha256
+
       - name: Upload Windows Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             Output/Tray-Setup.exe
+            Output/Tray-Setup.exe.sha256
 
   ##################################
   ## macOS
@@ -124,8 +135,13 @@ jobs:
           zip -r -y ../../../../Tray-macOS.zip *.app
           cd ../../../..
 
+          shasum -a 256 Tray.dmg > Tray.dmg.sha256 || true
+          shasum -a 256 Tray-macOS.zip > Tray-macOS.zip.sha256 || true
+
       - uses: softprops/action-gh-release@v2
         with:
           files: |
             Tray.dmg
+            Tray.dmg.sha256
             Tray-macOS.zip
+            Tray-macOS.zip.sha256

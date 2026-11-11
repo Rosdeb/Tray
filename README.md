@@ -10,11 +10,12 @@
 [![Build & Release](https://img.shields.io/github/actions/workflow/status/Rosdeb/Tray/android-release.yml?style=for-the-badge&label=Build%20CI%2FCD)](https://github.com/Rosdeb/Tray/actions)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-informational?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Rosdeb/Tray/releases)
 [![Flutter](https://img.shields.io/badge/Flutter-3.44+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
+[![Security Policy](https://img.shields.io/badge/Security-Policy-blueviolet?style=for-the-badge&logo=shield)](SECURITY.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
 **Simulation Tray** is a modern, high-performance desktop emulator workstation that lets you create, download, configure, launch, monitor, and screen-mirror Android Virtual Devices (AVDs) **without needing Android Studio or heavy IDEs running in the background**.
 
-[Download Latest Release](https://github.com/Rosdeb/Tray/releases/latest) • [Key Features](#-key-features) • [Installation](#-installation) • [Usage Guide](#-usage-guide) • [Architecture](#-architecture)
+[Download Latest Release](https://github.com/Rosdeb/Tray/releases/latest) • [Key Features](#-key-features) • [Installation](#-installation) • [Security Policy](SECURITY.md) • [Usage Guide](#-usage-guide) • [Architecture](#-architecture)
 
 </div>
 
@@ -83,12 +84,24 @@ Download the latest pre-compiled binary for your operating system from the **[Re
 ### Windows (10 / 11)
 1. Download **`Tray-Setup.exe`**.
 2. Run the installer (built with Inno Setup) and follow the setup wizard.
-3. Launch **Simulation Tray** from the Start Menu or Desktop shortcut.
+   > **Note on Windows Defender SmartScreen ("Run anyway")**:
+   > Because Simulation Tray is an open-source tool built on GitHub Actions without an expensive proprietary EV certificate, Windows SmartScreen may show *"Windows protected your PC — Microsoft Defender SmartScreen prevented an unrecognized app from starting"*.
+   > 
+   > **To proceed safely**:
+   > 1. Click **"More info"**.
+   > 2. Verify the application name is `Tray-Setup.exe`.
+   > 3. Click **"Run anyway"**.
+   > 
+   > You can verify the file hash in PowerShell anytime against our official release SHA-256 checksums:
+   > ```powershell
+   > Get-FileHash .\Tray-Setup.exe -Algorithm SHA256
+   > ```
+3. Launch **Simulation Tray** from the Start Menu or Desktop shortcut. Subsequent in-app updates run automatically via the built-in update client.
 
 ### macOS (Apple Silicon & Intel)
-1. Download **`Tray.dmg`**.
+1. Download **`Tray.dmg`** (or `Tray-macOS.zip`).
 2. Open the `.dmg` disk image and drag **Tray** to your `/Applications` folder.
-3. Open Tray from Applications or Spotlight.
+3. Open Tray from Applications or Spotlight. (On first launch, if prompted by macOS Gatekeeper, click *Open* or allow in *System Settings > Privacy & Security*).
 
 ---
 
