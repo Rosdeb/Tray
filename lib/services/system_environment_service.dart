@@ -336,18 +336,302 @@ class SystemEnvironmentService {
     return null;
   }
 
-  /// Checks if scrcpy is installed on the machine.
-  Future<String?> findScrcpy() async {
+  /// Resolves an input file or folder path into a valid scrcpy executable path.
+  static String? resolveScrcpyExecutable(String inputPath) {
+    final trimmed = inputPath.trim();
+    if (trimmed.isEmpty) return null;
+
+    final file = File(trimmed);
+    if (file.existsSync()) {
+      return file.absolute.path;
+    }
+
+    final dir = Directory(trimmed);
+    if (dir.existsSync()) {
+      if (Platform.isWindows) {
+        final exe = File(p.join(trimmed, 'scrcpy.exe'));
+        if (exe.existsSync()) return exe.absolute.path;
+        final bat = File(p.join(trimmed, 'scrcpy.bat'));
+        if (bat.existsSync()) return bat.absolute.path;
+      } else {
+        final bin = File(p.join(trimmed, 'scrcpy'));
+        if (bin.existsSync()) return bin.absolute.path;
+      }
+
+      // Check immediate child directories (e.g. extracted scrcpy-win64 folder inside selected folder)
+      try {
+        for (final entity in dir.listSync(followLinks: false)) {
+          if (entity is Directory) {
+            final target = Platform.isWindows
+                ? File(p.join(entity.path, 'scrcpy.exe'))
+                : File(p.join(entity.path, 'scrcpy'));
+            if (target.existsSync()) return target.absolute.path;
+          }
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  /// Opens the official scrcpy releases download page in the system browser.
+  static Future<void> openScrcpyDownloadPage() async {
+    const url = 'https://github.com/Genymobile/scrcpy/releases';
     try {
-      final cmd = Platform.isWindows ? 'where' : 'which';
-      final result = await Process.run(cmd, ['scrcpy']);
-      if (result.exitCode == 0) {
-        final path = result.stdout.toString().split(RegExp(r'\r?\n')).first.trim();
-        if (path.isNotEmpty && await File(path).exists()) {
-          return path;
+      if (Platform.isWindows) {
+        await Process.run('cmd', ['/c', 'start', '', url]);
+      } else if (Platform.isMacOS) {
+        await Process.run('open', [url]);
+      } else if (Platform.isLinux) {
+        await Process.run('xdg-open', [url]);
+      }
+    } catch (_) {}
+  }
+
+  /// Checks if scrcpy is installed on the machine.
+  /// Looks in:
+  /// 1. Custom user path if provided
+  /// 2. Active PATH (where.exe on Windows, which on macOS/Linux)
+  /// 3. Windows Registry PATH (HKCU & HKLM environment keys)
+  /// 4. Windows Package managers (WinGet links & packages, Scoop, Chocolatey)
+  /// 5. Standard Windows installation and extraction directories (C:\scrcpy, Downloads\scrcpy*, Desktop\scrcpy*, Program Files)
+  /// 6. Android SDK directory if known
+  /// 7. macOS / Linux standard paths (/opt/homebrew, /usr/local, /snap, etc.)
+  Future<String?> findScrcpy({String? customPath, String? sdkPath}) async {
+    // 1. Explicit custom path from settings
+    if (customPath != null && customPath.trim().isNotEmpty) {
+      final resolved = resolveScrcpyExecutable(customPath.trim());
+      if (resolved != null) return resolved;
+    }
+
+    // 2. PATH resolution via where.exe / which
+    final pathFromPath = await _findScrcpyFromSystemPath();
+    if (pathFromPath != null) return pathFromPath;
+
+    // 3. Platform-specific deep search
+    if (Platform.isWindows) {
+      final winPath = await _findScrcpyOnWindows(sdkPath: sdkPath);
+      if (winPath != null) return winPath;
+    } else if (Platform.isMacOS) {
+      final macPath = await _findScrcpyOnMac(sdkPath: sdkPath);
+      if (macPath != null) return macPath;
+    } else if (Platform.isLinux) {
+      final linuxPath = await _findScrcpyOnLinux(sdkPath: sdkPath);
+      if (linuxPath != null) return linuxPath;
+    }
+
+    return null;
+  }
+
+  static Future<String?> _findScrcpyFromSystemPath() async {
+    try {
+      if (Platform.isWindows) {
+        for (final bin in ['scrcpy.exe', 'scrcpy']) {
+          final res = await Process.run('where.exe', [bin], runInShell: true);
+          if (res.exitCode == 0) {
+            final lines = res.stdout.toString().split(RegExp(r'\r?\n'));
+            for (final line in lines) {
+              final trimmed = line.trim();
+              if (trimmed.isNotEmpty && File(trimmed).existsSync()) {
+                return trimmed;
+              }
+            }
+          }
+        }
+      } else {
+        final res = await Process.run('which', ['scrcpy']);
+        if (res.exitCode == 0) {
+          final trimmed = res.stdout.toString().trim();
+          if (trimmed.isNotEmpty && File(trimmed).existsSync()) {
+            return trimmed;
+          }
         }
       }
     } catch (_) {}
+    return null;
+  }
+
+  static Future<String?> _findScrcpyOnWindows({String? sdkPath}) async {
+    final env = Platform.environment;
+    final userProfile = env['USERPROFILE'] ?? '';
+    final localAppData = env['LOCALAPPDATA'] ?? '';
+    final appData = env['APPDATA'] ?? '';
+    final programFiles = env['ProgramFiles'] ?? r'C:\Program Files';
+    final programFilesX86 = env['ProgramFiles(x86)'] ?? r'C:\Program Files (x86)';
+    final programData = env['ProgramData'] ?? r'C:\ProgramData';
+
+    final directCandidates = <String>[
+      // WinGet links
+      if (localAppData.isNotEmpty)
+        p.join(localAppData, 'Microsoft', 'WinGet', 'Links', 'scrcpy.exe'),
+      // Scoop
+      if (userProfile.isNotEmpty) ...[
+        p.join(userProfile, 'scoop', 'shims', 'scrcpy.exe'),
+        p.join(userProfile, 'scoop', 'apps', 'scrcpy', 'current', 'scrcpy.exe'),
+      ],
+      // Chocolatey
+      p.join(programData, 'chocolatey', 'bin', 'scrcpy.exe'),
+      p.join(programData, 'chocolatey', 'lib', 'scrcpy', 'tools', 'scrcpy.exe'),
+      r'C:\tools\scrcpy\scrcpy.exe',
+      // Standard folders
+      p.join(programFiles, 'scrcpy', 'scrcpy.exe'),
+      p.join(programFilesX86, 'scrcpy', 'scrcpy.exe'),
+      if (localAppData.isNotEmpty)
+        p.join(localAppData, 'Programs', 'scrcpy', 'scrcpy.exe'),
+      if (appData.isNotEmpty)
+        p.join(appData, 'scrcpy', 'scrcpy.exe'),
+      if (userProfile.isNotEmpty) ...[
+        p.join(userProfile, 'scrcpy', 'scrcpy.exe'),
+        p.join(userProfile, 'scrcpy-win64', 'scrcpy.exe'),
+      ],
+      // Drive roots
+      r'C:\scrcpy\scrcpy.exe',
+      r'C:\scrcpy-win64\scrcpy.exe',
+      r'D:\scrcpy\scrcpy.exe',
+      r'D:\scrcpy-win64\scrcpy.exe',
+      r'E:\scrcpy\scrcpy.exe',
+      // SDK subfolders
+      if (sdkPath != null && sdkPath.isNotEmpty) ...[
+        p.join(sdkPath, 'platform-tools', 'scrcpy.exe'),
+        p.join(sdkPath, 'scrcpy', 'scrcpy.exe'),
+        p.join(sdkPath, 'tools', 'scrcpy.exe'),
+      ],
+    ];
+
+    for (final c in directCandidates) {
+      if (File(c).existsSync()) return c;
+    }
+
+    // Check Windows Registry PATH
+    try {
+      final regKeys = [
+        r'HKCU\Environment',
+        r'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment',
+      ];
+      for (final key in regKeys) {
+        final res = await Process.run('reg', ['query', key, '/v', 'Path']);
+        if (res.exitCode == 0) {
+          final out = res.stdout.toString();
+          final lines = out.split(RegExp(r'\r?\n'));
+          for (final line in lines) {
+            final trimmedLine = line.trim();
+            if (trimmedLine.toLowerCase().startsWith('path')) {
+              final parts = trimmedLine.split(RegExp(r'\s{2,}|\t+'));
+              if (parts.length >= 3) {
+                final rawPathVal = parts.sublist(2).join(' ');
+                for (final item in rawPathVal.split(';')) {
+                  var dir = item.trim();
+                  if (dir.isNotEmpty) {
+                    if (dir.contains('%')) {
+                      for (final entry in Platform.environment.entries) {
+                        dir = dir.replaceAll('%${entry.key}%', entry.value);
+                      }
+                    }
+                    final target = File(p.join(dir, 'scrcpy.exe'));
+                    if (target.existsSync()) return target.path;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    // Check WinGet Packages
+    if (localAppData.isNotEmpty) {
+      try {
+        final packagesDir = Directory(p.join(localAppData, 'Microsoft', 'WinGet', 'Packages'));
+        if (packagesDir.existsSync()) {
+          for (final entity in packagesDir.listSync(followLinks: false)) {
+            if (entity is Directory && p.basename(entity.path).toLowerCase().contains('scrcpy')) {
+              final direct = File(p.join(entity.path, 'scrcpy.exe'));
+              if (direct.existsSync()) return direct.path;
+              for (final sub in entity.listSync(recursive: true, followLinks: false)) {
+                if (sub is File && p.basename(sub.path).toLowerCase() == 'scrcpy.exe') {
+                  return sub.path;
+                }
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Scan user directories (Downloads, Desktop, Documents) and root drives for extracted folders
+    final searchRoots = <String>[
+      if (userProfile.isNotEmpty) p.join(userProfile, 'Downloads'),
+      if (userProfile.isNotEmpty) p.join(userProfile, 'Desktop'),
+      if (userProfile.isNotEmpty) p.join(userProfile, 'Documents'),
+      r'C:\',
+      r'D:\',
+    ];
+
+    for (final root in searchRoots) {
+      try {
+        final dir = Directory(root);
+        if (dir.existsSync()) {
+          for (final entity in dir.listSync(followLinks: false)) {
+            if (entity is Directory) {
+              final name = p.basename(entity.path).toLowerCase();
+              if (name.contains('scrcpy')) {
+                final direct = File(p.join(entity.path, 'scrcpy.exe'));
+                if (direct.existsSync()) return direct.path;
+                for (final sub in entity.listSync(followLinks: false)) {
+                  if (sub is File && p.basename(sub.path).toLowerCase() == 'scrcpy.exe') {
+                    return sub.path;
+                  }
+                  if (sub is Directory && p.basename(sub.path).toLowerCase().contains('scrcpy')) {
+                    final subExe = File(p.join(sub.path, 'scrcpy.exe'));
+                    if (subExe.existsSync()) return subExe.path;
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    return null;
+  }
+
+  static Future<String?> _findScrcpyOnMac({String? sdkPath}) async {
+    final home = Platform.environment['HOME'] ?? '';
+    final candidates = <String>[
+      '/opt/homebrew/bin/scrcpy',
+      '/usr/local/bin/scrcpy',
+      if (home.isNotEmpty) p.join(home, '.homebrew', 'bin', 'scrcpy'),
+      '/opt/local/bin/scrcpy',
+      '/Applications/scrcpy.app/Contents/MacOS/scrcpy',
+      if (sdkPath != null && sdkPath.isNotEmpty) ...[
+        p.join(sdkPath, 'platform-tools', 'scrcpy'),
+        p.join(sdkPath, 'scrcpy', 'scrcpy'),
+      ],
+    ];
+    for (final c in candidates) {
+      if (File(c).existsSync()) return c;
+    }
+    return null;
+  }
+
+  static Future<String?> _findScrcpyOnLinux({String? sdkPath}) async {
+    final home = Platform.environment['HOME'] ?? '';
+    final candidates = <String>[
+      '/usr/bin/scrcpy',
+      '/usr/local/bin/scrcpy',
+      '/snap/bin/scrcpy',
+      if (home.isNotEmpty) ...[
+        p.join(home, '.local', 'bin', 'scrcpy'),
+        p.join(home, '.cargo', 'bin', 'scrcpy'),
+      ],
+      if (sdkPath != null && sdkPath.isNotEmpty) ...[
+        p.join(sdkPath, 'platform-tools', 'scrcpy'),
+        p.join(sdkPath, 'scrcpy', 'scrcpy'),
+      ],
+    ];
+    for (final c in candidates) {
+      if (File(c).existsSync()) return c;
+    }
     return null;
   }
 }

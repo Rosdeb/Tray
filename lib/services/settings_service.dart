@@ -7,6 +7,7 @@ class SettingsService {
   SettingsService(this._preferences);
 
   static const _sdkPathKey = 'sdkPath';
+  static const _scrcpyPathKey = 'scrcpyPath';
   static const _themeModeKey = 'themeMode';
   static const _startupKey = 'startWithWindows';
   static const _notificationsKey = 'notificationsEnabled';
@@ -33,6 +34,7 @@ class SettingsService {
 
     return AppSettings(
       sdkPath: _preferences.getString(_sdkPathKey),
+      scrcpyPath: _preferences.getString(_scrcpyPathKey),
       themeMode: _themeModeFromName(_preferences.getString(_themeModeKey)),
       startWithWindows: _preferences.getBool(_startupKey) ?? false,
       notificationsEnabled: _preferences.getBool(_notificationsKey) ?? true,
@@ -49,6 +51,13 @@ class SettingsService {
       await _preferences.remove(_sdkPathKey);
     } else {
       await _preferences.setString(_sdkPathKey, sdkPath);
+    }
+
+    final scrcpyPath = settings.scrcpyPath;
+    if (scrcpyPath == null || scrcpyPath.trim().isEmpty) {
+      await _preferences.remove(_scrcpyPathKey);
+    } else {
+      await _preferences.setString(_scrcpyPathKey, scrcpyPath);
     }
     await _preferences.setString(_themeModeKey, settings.themeMode.name);
     await _preferences.setBool(_startupKey, settings.startWithWindows);

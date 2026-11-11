@@ -77,8 +77,15 @@ class EmulatorRepository {
     required AndroidSdk sdk,
     required String serial,
     String? windowTitle,
+    String? customPath,
   }) {
-    return scrcpyService.startMirror(serial: serial, windowTitle: windowTitle);
+    return scrcpyService.startMirror(
+      serial: serial,
+      windowTitle: windowTitle,
+      customPath: customPath,
+      sdkPath: sdk.path,
+      adbPath: sdk.adbPath,
+    );
   }
 
   Stream<SdkInstallProgress> setupEnvironment({

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 class AppSettings {
   const AppSettings({
     this.sdkPath,
+    this.scrcpyPath,
     this.themeMode = ThemeMode.system,
     this.startWithWindows = false,
     this.notificationsEnabled = true,
@@ -13,6 +14,7 @@ class AppSettings {
   });
 
   final String? sdkPath;
+  final String? scrcpyPath;
   final ThemeMode themeMode;
   final bool startWithWindows;
   final bool notificationsEnabled;
@@ -24,6 +26,8 @@ class AppSettings {
   AppSettings copyWith({
     String? sdkPath,
     bool clearSdkPath = false,
+    String? scrcpyPath,
+    bool clearScrcpyPath = false,
     ThemeMode? themeMode,
     bool? startWithWindows,
     bool? notificationsEnabled,
@@ -34,6 +38,7 @@ class AppSettings {
   }) {
     return AppSettings(
       sdkPath: clearSdkPath ? null : sdkPath ?? this.sdkPath,
+      scrcpyPath: clearScrcpyPath ? null : scrcpyPath ?? this.scrcpyPath,
       themeMode: themeMode ?? this.themeMode,
       startWithWindows: startWithWindows ?? this.startWithWindows,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -5,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/platform_paths.dart';
 import '../../providers/app_providers.dart';
+import '../../services/system_environment_service.dart';
 import '../../widgets/process_manager_section.dart';
 import '../../widgets/sdk_setup_dialog.dart';
 import '../../widgets/setting_switch_tile.dart';
@@ -18,7 +21,7 @@ class SettingsScreen extends ConsumerWidget {
     final controller = ref.read(settingsControllerProvider.notifier);
     final emuState = ref.watch(emulatorControllerProvider).value;
     final accelAsync = ref.watch(hardwareAccelerationProvider);
-    final scrcpyAsync = ref.watch(scrcpyAvailableProvider);
+    final scrcpyInfoAsync = ref.watch(scrcpyInfoProvider);
 
     return ListView(
       padding: const EdgeInsets.all(28),
@@ -94,12 +97,14 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
             const Divider(height: 16),
-            scrcpyAsync.when(
-              data: (available) => _EnvironmentDetailRow(
+            scrcpyInfoAsync.when(
+              data: (info) => _EnvironmentDetailRow(
                 icon: CupertinoIcons.tv,
                 label: 'Screen Mirroring (scrcpy)',
-                value: available ? 'Installed and available' : 'Not detected in PATH (optional)',
-                statusOk: available,
+                value: info.isAvailable
+                    ? (info.version != null ? '${info.version} (Ready)' : 'Installed and available')
+                    : 'Not detected in PATH (optional)',
+                statusOk: info.isAvailable,
               ),
               loading: () => const _EnvironmentDetailRow(
                 icon: CupertinoIcons.tv,
@@ -126,6 +131,7 @@ class SettingsScreen extends ConsumerWidget {
                 OutlinedButton.icon(
                   onPressed: () {
                     ref.invalidate(hardwareAccelerationProvider);
+                    ref.invalidate(scrcpyInfoProvider);
                     ref.read(emulatorControllerProvider.notifier).refresh();
                   },
                   icon: const Icon(CupertinoIcons.refresh),
@@ -346,6 +352,312 @@ class SettingsScreen extends ConsumerWidget {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 8),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+
+        // Screen Mirroring (scrcpy) Section
+        _Section(
+          title: 'Screen Mirroring (scrcpy)',
+          children: <Widget>[
+            const SizedBox(height: 10),
+            Builder(
+              builder: (innerContext) {
+                final scrcpyInfo = scrcpyInfoAsync.value;
+                final isAvailable = scrcpyInfo?.isAvailable ?? false;
+                final isCustom = scrcpyInfo?.isCustom ?? false;
+                final resolvedPath = scrcpyInfo?.path;
+                final version = scrcpyInfo?.version;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: (isAvailable
+                                    ? (isCustom ? Colors.purple : Theme.of(innerContext).colorScheme.primary)
+                                    : Colors.amber.shade800)
+                                .withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            isAvailable ? CupertinoIcons.tv : CupertinoIcons.tv_fill,
+                            color: isAvailable
+                                ? (isCustom ? Colors.purple : Theme.of(innerContext).colorScheme.primary)
+                                : Colors.amber.shade800,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Row(
+                                children: <Widget>[
+                                  Text(
+                                    isCustom ? 'Custom scrcpy Executable' : 'Auto Detect (PATH & Standard Folders)',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: isCustom
+                                          ? Colors.purple.withValues(alpha: 0.15)
+                                          : Theme.of(innerContext).colorScheme.primaryContainer,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      isCustom ? 'CUSTOM' : 'AUTO',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: isCustom
+                                            ? Colors.purple.shade700
+                                            : Theme.of(innerContext).colorScheme.onPrimaryContainer,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: isAvailable
+                                          ? Colors.green.withValues(alpha: 0.15)
+                                          : Colors.amber.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      isAvailable ? 'DETECTED' : 'NOT FOUND',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: isAvailable ? Colors.green.shade800 : Colors.amber.shade900,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              SelectableText(
+                                resolvedPath ??
+                                    'scrcpy was not detected automatically. If you downloaded scrcpy, select its .exe file or folder below.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontFamily: isAvailable ? 'monospace' : null,
+                                  color: isAvailable
+                                      ? null
+                                      : Theme.of(innerContext).colorScheme.error,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: <Widget>[
+                                  Icon(
+                                    isAvailable
+                                        ? CupertinoIcons.checkmark_circle_fill
+                                        : CupertinoIcons.exclamationmark_triangle_fill,
+                                    size: 16,
+                                    color: isAvailable ? Colors.green : Colors.amber.shade800,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      isAvailable
+                                          ? '${version ?? "scrcpy"} ready • Supports direct low-latency emulator and device screen mirroring.'
+                                          : 'Searched PATH, WinGet, Scoop, Chocolatey, Downloads, and standard folders.',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isAvailable
+                                            ? Colors.green.shade800
+                                            : Colors.amber.shade900,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: <Widget>[
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                String? selectedFilePath;
+                                try {
+                                  final result = await FilePicker.pickFiles(
+                                    dialogTitle: 'Select scrcpy executable (scrcpy.exe)',
+                                    type: Platform.isWindows ? FileType.custom : FileType.any,
+                                    allowedExtensions: Platform.isWindows ? ['exe', 'bat'] : null,
+                                  );
+                                  selectedFilePath = result?.files.single.path;
+                                } catch (e) {
+                                  if (innerContext.mounted) {
+                                    ScaffoldMessenger.of(innerContext).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Could not open file picker: $e'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                  return;
+                                }
+                                if (selectedFilePath == null) return;
+
+                                final resolved = SystemEnvironmentService.resolveScrcpyExecutable(selectedFilePath);
+                                if (resolved != null) {
+                                  await controller.setScrcpyPath(resolved);
+                                  ref.invalidate(scrcpyInfoProvider);
+                                  if (innerContext.mounted) {
+                                    ScaffoldMessenger.of(innerContext).showSnackBar(
+                                      SnackBar(
+                                        content: Text('scrcpy configured: $resolved'),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                  }
+                                } else {
+                                  if (innerContext.mounted) {
+                                    ScaffoldMessenger.of(innerContext).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Selected file is not a valid scrcpy executable.'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                              icon: const Icon(CupertinoIcons.doc_text, size: 16),
+                              label: const Text('Browse Executable'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                String? selectedFolder;
+                                try {
+                                  selectedFolder = await FilePicker.getDirectoryPath(
+                                    dialogTitle: 'Select folder containing scrcpy',
+                                  );
+                                } catch (e) {
+                                  if (innerContext.mounted) {
+                                    ScaffoldMessenger.of(innerContext).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Could not open folder picker: $e'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                  return;
+                                }
+                                if (selectedFolder == null) return;
+
+                                final resolved = SystemEnvironmentService.resolveScrcpyExecutable(selectedFolder);
+                                if (resolved != null) {
+                                  await controller.setScrcpyPath(resolved);
+                                  ref.invalidate(scrcpyInfoProvider);
+                                  if (innerContext.mounted) {
+                                    ScaffoldMessenger.of(innerContext).showSnackBar(
+                                      SnackBar(
+                                        content: Text('scrcpy found and configured: $resolved'),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                  }
+                                } else {
+                                  if (innerContext.mounted) {
+                                    ScaffoldMessenger.of(innerContext).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Could not find scrcpy inside $selectedFolder'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                              icon: const Icon(CupertinoIcons.folder, size: 16),
+                              label: const Text('Select Folder'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                if (isCustom) {
+                                  await controller.setScrcpyPath(null);
+                                }
+                                ref.invalidate(scrcpyInfoProvider);
+                                final info = await ref.read(scrcpyInfoProvider.future);
+                                if (innerContext.mounted) {
+                                  ScaffoldMessenger.of(innerContext).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        info.isAvailable
+                                            ? 'scrcpy detected: ${info.path}'
+                                            : 'Auto-detection completed. scrcpy was not found. Please browse for scrcpy.exe manually.',
+                                      ),
+                                      backgroundColor: info.isAvailable ? Colors.green : Colors.orange,
+                                    ),
+                                  );
+                                }
+                              },
+                              icon: const Icon(CupertinoIcons.refresh, size: 16),
+                              label: Text(isCustom ? 'Reset to Auto' : 'Rescan'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    if (!isAvailable) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Theme.of(innerContext).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Theme.of(innerContext).colorScheme.outlineVariant.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        child: Row(
+                          children: <Widget>[
+                            Icon(
+                              CupertinoIcons.info_circle,
+                              size: 18,
+                              color: Theme.of(innerContext).colorScheme.primary,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Need scrcpy? Download the standalone package for Windows from GitHub releases or run "winget install scrcpy".',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(innerContext).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            FilledButton.tonalIcon(
+                              onPressed: () => SystemEnvironmentService.openScrcpyDownloadPage(),
+                              icon: const Icon(CupertinoIcons.arrow_down_circle, size: 16),
+                              label: const Text('Get scrcpy'),
+                              style: FilledButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 8),
                   ],
                 );

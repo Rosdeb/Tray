@@ -20,6 +20,37 @@ void main() {
       expect(accel.message, isNotEmpty);
       expect(accel.details, isNotEmpty);
     });
+
+    test('resolves scrcpy executable from direct file and directory', () {
+      final tempDir = Directory.systemTemp.createTempSync('scrcpy_test_');
+      try {
+        final mockExe = File('${tempDir.path}/${Platform.isWindows ? "scrcpy.exe" : "scrcpy"}')
+          ..writeAsStringSync('mock binary');
+
+        // From direct file
+        final fromFile = SystemEnvironmentService.resolveScrcpyExecutable(mockExe.path);
+        expect(fromFile, mockExe.path);
+
+        // From parent folder
+        final fromDir = SystemEnvironmentService.resolveScrcpyExecutable(tempDir.path);
+        expect(fromDir, mockExe.path);
+      } finally {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
+
+    test('findScrcpy prioritizes customPath when valid', () async {
+      final tempDir = Directory.systemTemp.createTempSync('scrcpy_custom_');
+      try {
+        final mockExe = File('${tempDir.path}/${Platform.isWindows ? "scrcpy.exe" : "scrcpy"}')
+          ..writeAsStringSync('mock binary');
+
+        final found = await envService.findScrcpy(customPath: mockExe.path);
+        expect(found, mockExe.path);
+      } finally {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
   });
 
   group('SdkInstallerService', () {

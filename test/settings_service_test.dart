@@ -13,6 +13,7 @@ void main() {
     await service.save(
       AppSettings(
         sdkPath: r'C:\Android\Sdk',
+        scrcpyPath: r'C:\scrcpy\scrcpy.exe',
         themeMode: ThemeMode.dark,
         startWithWindows: true,
         favoriteEmulators: const <String>{'Pixel_8'},
@@ -23,6 +24,7 @@ void main() {
     final loaded = service.load();
 
     expect(loaded.sdkPath, r'C:\Android\Sdk');
+    expect(loaded.scrcpyPath, r'C:\scrcpy\scrcpy.exe');
     expect(loaded.themeMode, ThemeMode.dark);
     expect(loaded.startWithWindows, isTrue);
     expect(loaded.favoriteEmulators, contains('Pixel_8'));

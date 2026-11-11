@@ -102,6 +102,9 @@ class SettingsController extends Notifier<AppSettings> {
   Future<void> setSdkPath(String? path) =>
       update(state.copyWith(sdkPath: path, clearSdkPath: path == null));
 
+  Future<void> setScrcpyPath(String? path) =>
+      update(state.copyWith(scrcpyPath: path, clearScrcpyPath: path == null));
+
   Future<void> setThemeMode(ThemeMode mode) =>
       update(state.copyWith(themeMode: mode));
 
@@ -141,8 +144,50 @@ final hardwareAccelerationProvider = FutureProvider<HardwareAccelerationInfo>((r
   return repo.checkHardwareAcceleration(emuState?.sdk);
 });
 
+class ScrcpyInfo {
+  const ScrcpyInfo({
+    required this.isAvailable,
+    this.path,
+    this.version,
+    this.isCustom = false,
+  });
+
+  final bool isAvailable;
+  final String? path;
+  final String? version;
+  final bool isCustom;
+}
+
+final scrcpyInfoProvider = FutureProvider<ScrcpyInfo>((ref) async {
+  final settings = ref.watch(settingsControllerProvider);
+  final emuState = ref.watch(emulatorControllerProvider).value;
+  final scrcpyService = ref.watch(scrcpyServiceProvider);
+
+  final path = await scrcpyService.findExecutable(
+    customPath: settings.scrcpyPath,
+    sdkPath: emuState?.sdk?.path,
+  );
+
+  if (path == null) {
+    return const ScrcpyInfo(isAvailable: false);
+  }
+
+  final version = await scrcpyService.getVersion(
+    customPath: settings.scrcpyPath,
+    sdkPath: emuState?.sdk?.path,
+  );
+
+  return ScrcpyInfo(
+    isAvailable: true,
+    path: path,
+    version: version,
+    isCustom: settings.scrcpyPath != null && settings.scrcpyPath!.trim().isNotEmpty,
+  );
+});
+
 final scrcpyAvailableProvider = FutureProvider<bool>((ref) async {
-  return ref.watch(scrcpyServiceProvider).isAvailable();
+  final info = await ref.watch(scrcpyInfoProvider.future);
+  return info.isAvailable;
 });
 
 class EmulatorState {
@@ -392,9 +437,14 @@ class EmulatorController extends AsyncNotifier<EmulatorState> {
     final serial = await ref.read(adbServiceProvider).findSerialForAvd(sdk.adbPath, emulator.name);
     if (serial == null) return;
 
+    final settings = ref.read(settingsControllerProvider);
+
     await ref.read(scrcpyServiceProvider).startMirror(
       serial: serial,
       windowTitle: '${emulator.name} (AEM Mirror)',
+      customPath: settings.scrcpyPath,
+      sdkPath: sdk.path,
+      adbPath: sdk.adbPath,
     );
   }
 
