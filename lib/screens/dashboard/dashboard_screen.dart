@@ -33,31 +33,37 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(emulatorControllerProvider);
 
-    return state.when(
-      loading: () => Padding(
-        padding: const EdgeInsets.fromLTRB(28, 24, 28, 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Android Emulator Manager', style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 6),
-            const Text('Loading emulators and environment...'),
-            const SizedBox(height: 40),
-            const Center(child: CircularProgressIndicator()),
-          ],
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 400),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.02),
+              end: Offset.zero,
+            ).animate(animation),
+            child: child,
+          ),
+        );
+      },
+      child: state.when(
+        loading: () => const _DashboardSkeleton(key: ValueKey('skeleton')),
+        error: (error, stackTrace) => _ErrorState(
+          key: const ValueKey('error'),
+          message: error.toString(),
+          onRetry: () => ref.read(emulatorControllerProvider.notifier).refresh(),
         ),
-      ),
-      error: (error, stackTrace) => _ErrorState(
-        message: error.toString(),
-        onRetry: () => ref.read(emulatorControllerProvider.notifier).refresh(),
-      ),
-      data: (data) {
-        final emulators = _applyFilters(data.emulators);
-        final hasSdk = data.sdk != null;
+        data: (data) {
+          final emulators = _applyFilters(data.emulators);
+          final hasSdk = data.sdk != null;
 
-        return RefreshIndicator(
-          onRefresh: () => ref.read(emulatorControllerProvider.notifier).refresh(),
-          child: CustomScrollView(
+          return RefreshIndicator(
+            key: const ValueKey('data'),
+            onRefresh: () => ref.read(emulatorControllerProvider.notifier).refresh(),
+            child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: <Widget>[
               SliverPadding(
@@ -173,7 +179,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ),
         );
       },
-    );
+    ));
   }
 
   List<Emulator> _applyFilters(List<Emulator> emulators) {
@@ -441,7 +447,7 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message, required this.onRetry});
+  const _ErrorState({super.key, required this.message, required this.onRetry});
 
   final String message;
   final VoidCallback onRetry;
@@ -461,6 +467,176 @@ class _ErrorState extends StatelessWidget {
             FilledButton.icon(onPressed: onRetry, icon: const Icon(CupertinoIcons.refresh), label: const Text('Retry')),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _DashboardSkeleton extends StatefulWidget {
+  const _DashboardSkeleton({super.key});
+
+  @override
+  State<_DashboardSkeleton> createState() => _DashboardSkeletonState();
+}
+
+class _DashboardSkeletonState extends State<_DashboardSkeleton> with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseController;
+  late final Animation<double> _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    )..repeat(reverse: true);
+
+    _pulseAnimation = Tween<double>(begin: 0.35, end: 0.8).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  Widget _box({required double width, required double height, double radius = 8}) {
+    return AnimatedBuilder(
+      animation: _pulseAnimation,
+      builder: (context, child) {
+        final theme = Theme.of(context);
+        return Opacity(
+          opacity: _pulseAnimation.value,
+          child: Container(
+            width: width,
+            height: height,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+              borderRadius: BorderRadius.circular(radius),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return SingleChildScrollView(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(28, 24, 28, 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Skeleton
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Android Emulator Manager', style: theme.textTheme.headlineSmall),
+                    const SizedBox(height: 8),
+                    _box(width: 260, height: 14, radius: 4),
+                  ],
+                ),
+              ),
+              _box(width: 140, height: 42, radius: 21),
+              const SizedBox(width: 10),
+              _box(width: 100, height: 42, radius: 21),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // 4 Stat Tiles Skeleton
+          Row(
+            children: List.generate(4, (index) {
+              return Expanded(
+                child: Container(
+                  margin: EdgeInsets.only(right: index < 3 ? 12 : 0),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      _box(width: 32, height: 32, radius: 8),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _box(width: 36, height: 18, radius: 4),
+                            const SizedBox(height: 6),
+                            _box(width: 64, height: 12, radius: 4),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 24),
+
+          // Search Bar & Filter Skeleton
+          Row(
+            children: [
+              Expanded(
+                child: _box(width: double.infinity, height: 46, radius: 28),
+              ),
+              const SizedBox(width: 12),
+              _box(width: 220, height: 40, radius: 20),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // 2 Emulator Card Skeletons
+          ...List.generate(2, (index) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: theme.dividerColor.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                children: [
+                  _box(width: 44, height: 44, radius: 12),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _box(width: 180, height: 18, radius: 4),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            _box(width: 64, height: 16, radius: 8),
+                            const SizedBox(width: 6),
+                            _box(width: 72, height: 16, radius: 8),
+                            const SizedBox(width: 6),
+                            _box(width: 58, height: 16, radius: 8),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  _box(width: 100, height: 38, radius: 19),
+                ],
+              ),
+            );
+          }),
+        ],
       ),
     );
   }
