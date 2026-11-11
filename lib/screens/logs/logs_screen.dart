@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -22,7 +23,7 @@ class LogsScreen extends ConsumerWidget {
               Expanded(child: Text('Logs', style: Theme.of(context).textTheme.headlineSmall)),
               OutlinedButton.icon(
                 onPressed: () => ref.read(emulatorControllerProvider.notifier).refresh(),
-                icon: const Icon(Icons.refresh),
+                icon: const Icon(CupertinoIcons.refresh),
                 label: const Text('Refresh'),
               ),
             ],
@@ -51,9 +52,9 @@ class _LogTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final icon = switch (entry.level) {
-      LogLevel.info => Icons.info_outline,
-      LogLevel.warning => Icons.warning_amber_outlined,
-      LogLevel.error => Icons.error_outline,
+      LogLevel.info => CupertinoIcons.info_circle,
+      LogLevel.warning => CupertinoIcons.exclamationmark_triangle,
+      LogLevel.error => CupertinoIcons.exclamationmark_circle,
     };
     return ListTile(
       contentPadding: EdgeInsets.zero,

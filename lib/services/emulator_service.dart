@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import '../core/utils/platform_paths.dart';
 import '../models/emulator.dart';
 import 'adb_service.dart';
 
@@ -15,6 +16,9 @@ class EmulatorLaunchOptions {
     this.memoryMb,
     this.dpi,
     this.landscape = false,
+    this.port,
+    this.noWindow = false,
+    this.wipeData = false,
   });
 
   final bool coldBoot;
@@ -24,18 +28,23 @@ class EmulatorLaunchOptions {
   final int? memoryMb;
   final int? dpi;
   final bool landscape;
+  final int? port;
+  final bool noWindow;
+  final bool wipeData;
 
   List<String> toArguments(String name) {
     return <String>[
       '-avd',
       name,
+      if (port != null) ...<String>['-port', port.toString()],
       if (coldBoot || noSnapshot) '-no-snapshot-load',
+      if (wipeData) '-wipe-data',
       if (writableSystem) '-writable-system',
+      if (noWindow) '-no-window',
       if (gpu != null && gpu!.trim().isNotEmpty) ...<String>['-gpu', gpu!],
       if (memoryMb != null) ...<String>['-memory', memoryMb.toString()],
       if (dpi != null) ...<String>['-dpi-device', dpi.toString()],
-      if (landscape) '-skin',
-      if (landscape) 'landscape',
+      if (landscape) ...<String>['-skin', 'landscape'],
     ];
   }
 }
@@ -78,21 +87,46 @@ class EmulatorService {
       ..sort(_sortEmulators);
   }
 
-  Future<void> launch({
+  /// Launch an emulator instance.
+  /// If [options.port] is not specified and [adbPath] is provided, auto-assigns next free even port.
+  Future<int?> launch({
     required String emulatorPath,
     required String name,
+    String? adbPath,
     EmulatorLaunchOptions options = const EmulatorLaunchOptions(),
   }) async {
-    final args = options.toArguments(name);
+    int? port = options.port;
+    if (port == null && adbPath != null && adbPath.isNotEmpty) {
+      try {
+        port = await _adbService.getNextAvailablePort(adbPath);
+      } catch (_) {}
+    }
+
+    final finalOptions = port != null ? EmulatorLaunchOptions(
+      coldBoot: options.coldBoot,
+      noSnapshot: options.noSnapshot,
+      writableSystem: options.writableSystem,
+      gpu: options.gpu,
+      memoryMb: options.memoryMb,
+      dpi: options.dpi,
+      landscape: options.landscape,
+      port: port,
+      noWindow: options.noWindow,
+      wipeData: options.wipeData,
+    ) : options;
+
+    final args = finalOptions.toArguments(name);
 
     if (Platform.isWindows) {
       await _launchHiddenWindows(emulatorPath, args);
     } else {
       await Process.start(emulatorPath, args, mode: ProcessStartMode.detached);
     }
+
+    return port;
   }
+
   Future<void> _launchHiddenWindows(String executable, List<String> arguments) async {
-    // for hide cmd use the wscript.exe for background process run :
     final tempDir = Directory.systemTemp.createTempSync('emulator_launch_');
     final vbsFile = File(p.join(tempDir.path, 'run_hidden.vbs'));
 
@@ -105,8 +139,7 @@ class EmulatorService {
 
     await Process.start('wscript.exe', [vbsFile.path]);
 
-
-    Future.delayed(const Duration(seconds: 2), () {
+    Future.delayed(const Duration(seconds: 3), () {
       try {
         if (vbsFile.existsSync()) {
           vbsFile.deleteSync();
@@ -114,29 +147,36 @@ class EmulatorService {
         if (tempDir.existsSync()) {
           tempDir.deleteSync();
         }
-      } catch (_) {
-
-      }
+      } catch (_) {}
     });
   }
 
-
+  /// Stops an emulator cleanly using `adb emu kill`.
   Future<void> stop({
     required String adbPath,
     required String name,
   }) async {
-    final devices = await _adbService.devices(adbPath);
-    for (final line in devices) {
-      final parts = line.split(RegExp(r'\s+'));
-      if (parts.isEmpty || !parts.first.startsWith('emulator-')) {
-        continue;
+    await _adbService.killByAvdName(adbPath, name);
+  }
+
+  /// Polls ADB until sys.boot_completed is 1 or timeout expires.
+  Future<bool> waitForBootCompleted({
+    required String adbPath,
+    required String avdName,
+    Duration timeout = const Duration(minutes: 3),
+  }) async {
+    final stopWatch = Stopwatch()..start();
+    while (stopWatch.elapsed < timeout) {
+      final serial = await _adbService.findSerialForAvd(adbPath, avdName);
+      if (serial != null) {
+        final isBooted = await _adbService.isBootCompleted(adbPath, serial);
+        if (isBooted) {
+          return true;
+        }
       }
-      final avdName = await _adbService.avdName(adbPath, parts.first);
-      if (avdName == name) {
-        await _adbService.kill(adbPath, parts.first);
-        return;
-      }
+      await Future.delayed(const Duration(seconds: 2));
     }
+    return false;
   }
 
   Future<Set<String>> _runningAvdNames(String adbPath) async {
@@ -237,12 +277,7 @@ class EmulatorService {
   }
 
   String? _avdHome() {
-    final env = Platform.environment;
-    final home = env[Platform.isWindows ? 'USERPROFILE' : 'HOME'];
-    if (home == null || home.trim().isEmpty) {
-      return null;
-    }
-    return p.join(home, '.android', 'avd');
+    return PlatformPaths.defaultAvdHome();
   }
 
   int _sortEmulators(Emulator left, Emulator right) {

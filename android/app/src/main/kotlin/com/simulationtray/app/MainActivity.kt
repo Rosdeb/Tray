@@ -1,4 +1,4 @@
-package com.example.tray
+package com.simulationtray.app
 
 import io.flutter.embedding.android.FlutterActivity
 

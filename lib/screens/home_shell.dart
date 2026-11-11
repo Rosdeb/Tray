@@ -1,15 +1,17 @@
 import 'dart:io';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:window_manager/window_manager.dart';
-import '../core/constants/app_constants.dart';
 import '../providers/app_providers.dart';
+import '../services/tray_service.dart';
 import '../services/update_service.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'logs/logs_screen.dart';
+import 'monitor/monitor_screen.dart';
 import 'settings/settings_screen.dart';
 
 class HomeShell extends ConsumerStatefulWidget {
@@ -23,10 +25,12 @@ class _HomeShellState extends ConsumerState<HomeShell>
     with WindowListener {
   int _selectedIndex = 0;
   bool _allowClose = false;
+  late final AppTrayService _trayService;
 
   @override
   void initState() {
     super.initState();
+    _trayService = ref.read(trayServiceProvider);
     _initializeTray();
 
     if (Platform.isWindows) {
@@ -36,7 +40,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
   }
 
   Future<void> _initializeTray() async {
-    await ref.read(trayServiceProvider).initialize(
+    await _trayService.initialize(
       onRefresh: () =>
           ref.read(emulatorControllerProvider.notifier).refresh(),
       onExit: () async {
@@ -70,7 +74,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
       windowManager.removeListener(this);
     }
 
-    ref.read(trayServiceProvider).dispose();
+    _trayService.dispose();
     super.dispose();
   }
 
@@ -78,6 +82,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
   Widget build(BuildContext context) {
     final pages = [
       const DashboardScreen(),
+      const MonitorScreen(),
       const SettingsScreen(),
       const LogsScreen(),
     ];
@@ -144,6 +149,11 @@ class AppSidebar extends ConsumerWidget {
       title: 'Dashboard',
     ),
     SidebarItem(
+      icon: Iconsax.status_up_copy,
+      selectedIcon: Iconsax.status_up,
+      title: 'Monitor',
+    ),
+    SidebarItem(
       icon: Iconsax.setting_2_copy,
       selectedIcon: Iconsax.setting_2,
       title: 'Settings',
@@ -160,7 +170,7 @@ class AppSidebar extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
-      width: 160,
+      width: 200,
       color: colorScheme.surface,
       child: Column(
         children: [
@@ -272,21 +282,21 @@ class _VersionUpdateTileState extends ConsumerState<VersionUpdateTile> {
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(.12),
+                    color: Colors.green.withValues(alpha: .12),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(
-                        Icons.check_circle,
+                    children: [
+                      const Icon(
+                        CupertinoIcons.checkmark_circle_fill,
                         size: 14,
                         color: Colors.green,
                       ),
-                      SizedBox(width: 6),
+                      const SizedBox(width: 6),
                       Text(
-                        "Already up to date",
-                        style: TextStyle(
+                        _currentVersion.isEmpty ? "Up to date" : "v$_currentVersion (Latest)",
+                        style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: Colors.green,
@@ -319,14 +329,14 @@ class _VersionUpdateTileState extends ConsumerState<VersionUpdateTile> {
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: colorScheme.primary.withOpacity(.12),
+                    color: colorScheme.primary.withValues(alpha: .12),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        Icons.system_update_alt,
+                        CupertinoIcons.arrow_down_circle,
                         size: 14,
                         color: colorScheme.primary,
                       ),
@@ -345,7 +355,7 @@ class _VersionUpdateTileState extends ConsumerState<VersionUpdateTile> {
               );
             },
             loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
           )
 
         ],
@@ -397,13 +407,13 @@ class _SidebarTileState extends State<SidebarTile> {
             vertical: 12,
           ),
           transform: pressed
-              ? (Matrix4.identity()..scale(.96))
+              ? (Matrix4.identity()..scaleByDouble(.96, .96, 1.0, 1.0))
               : Matrix4.identity(),
           decoration: BoxDecoration(
             color: widget.active
-                ? colorScheme.primary.withOpacity(.10)
+                ? colorScheme.primary.withValues(alpha: .10)
                 : hover
-                ? colorScheme.primary.withOpacity(.04)
+                ? colorScheme.primary.withValues(alpha: .04)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             border: Border(
@@ -431,15 +441,18 @@ class _SidebarTileState extends State<SidebarTile> {
                 ),
               ),
               const SizedBox(width: 12),
-              Text(
-                widget.item.title,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight:
-                  widget.active ? FontWeight.w600 : FontWeight.w500,
-                  color: widget.active
-                      ? colorScheme.primary
-                      : colorScheme.onSurfaceVariant,
+              Expanded(
+                child: Text(
+                  widget.item.title,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight:
+                    widget.active ? FontWeight.w600 : FontWeight.w500,
+                    color: widget.active
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
             ],
@@ -482,8 +495,8 @@ class WindowCaptionButtons extends StatelessWidget {
           style: IconButton.styleFrom(
             fixedSize: const Size(46, 46),
             hoverColor: isDark
-                ? Colors.white.withOpacity(0.1)
-                : Colors.black.withOpacity(0.05),
+                ? Colors.white.withValues(alpha: 0.1)
+                : Colors.black.withValues(alpha: 0.05),
             shape: const RoundedRectangleBorder(
               borderRadius: BorderRadius.zero,
             ),
@@ -501,7 +514,7 @@ class WindowCaptionButtons extends StatelessWidget {
         IconButton(
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 46, minHeight: 46),
-          icon: const Icon(Icons.close, size: 16),
+          icon: const Icon(CupertinoIcons.xmark, size: 16),
           style: IconButton.styleFrom(
             hoverColor: Colors.red,
             foregroundColor: iconColor,

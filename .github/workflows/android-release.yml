@@ -35,15 +35,15 @@ jobs:
       - name: Create Inno Setup Script
         shell: bash
         run: |
-          cat > installer.iss << 'EOF'
+          cat > installer.iss << EOF
           #define MyAppName "Tray"
           #define MyAppExeName "tray.exe"
-          #define MyAppPublisher "YourCompanyName"
+          #define MyAppPublisher "SimulationTray"
 
           [Setup]
           AppId={{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
           AppName={#MyAppName}
-          AppVersion=1.0.0
+          AppVersion=${{ github.ref_name }}
           AppPublisher={#MyAppPublisher}
           DefaultDirName={autopf}\{#MyAppName}
           DefaultGroupName={#MyAppName}
@@ -55,14 +55,14 @@ jobs:
           ArchitecturesInstallIn64BitMode=x64
 
           [Files]
-          Source: "build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs
+          Source: "build\\windows\\x64\\runner\\Release\\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs
 
           [Icons]
-          Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-          Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+          Name: "{group}\\{#MyAppName}"; Filename: "{app}\\{#MyAppExeName}"
+          Name: "{autodesktop}\\{#MyAppName}"; Filename: "{app}\\{#MyAppExeName}"
 
           [Run]
-          Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
+          Filename: "{app}\\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
           EOF
 
       - name: Install Inno Setup
@@ -72,12 +72,6 @@ jobs:
         shell: cmd
         run: |
           "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
-
-      - name: Delete existing release (if any)
-        shell: bash
-        run: gh release delete ${{ github.ref_name }} --yes --cleanup-tag || true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Windows Release
         uses: softprops/action-gh-release@v2
