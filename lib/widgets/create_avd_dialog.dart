@@ -409,7 +409,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Category chips
+        // Category chips / simple tab bar
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
           child: Column(
@@ -420,22 +420,20 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
                 style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 10),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
+              Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: theme.dividerColor.withValues(alpha: 0.25)),
+                ),
                 child: Row(
-                  children: ['All', 'Phones', 'Tablets & Fold', 'Other'].map((cat) {
-                    final selected = _categoryFilter == cat;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: FilterChip(
-                        selected: selected,
-                        label: Text(cat, style: TextStyle(fontSize: 12, fontWeight: selected ? FontWeight.bold : FontWeight.normal)),
-                        onSelected: (_) => setState(() => _categoryFilter = cat),
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    );
-                  }).toList(),
+                  children: [
+                    _buildTabItem(theme, 'All', 'All'),
+                    _buildTabItem(theme, 'Phones', 'Phones'),
+                    _buildTabItem(theme, 'Tablets', 'Tablets & Fold'),
+                    _buildTabItem(theme, 'Other', 'Other'),
+                  ],
                 ),
               ),
             ],
@@ -454,24 +452,23 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
               final isSelected = _selectedDevice.id == device.id;
 
               return InkWell(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
                 onTap: () {
                   setState(() {
                     _selectedDevice = device;
                     _nameController.text = _formatName(device.name, _selectedVersion.api);
                   });
                 },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
+                child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
                     color: isSelected
                         ? theme.colorScheme.primary.withValues(alpha: 0.1)
-                        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(12),
+                        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: isSelected ? theme.colorScheme.primary : theme.dividerColor.withValues(alpha: 0.4),
-                      width: isSelected ? 1.8 : 1,
+                      color: isSelected ? theme.colorScheme.primary : theme.dividerColor.withValues(alpha: 0.3),
+                      width: isSelected ? 1.5 : 1,
                     ),
                   ),
                   child: Row(
@@ -521,6 +518,32 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildTabItem(ThemeData theme, String label, String catValue) {
+    final selected = _categoryFilter == catValue;
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(6),
+        onTap: () => setState(() => _categoryFilter = catValue),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          decoration: BoxDecoration(
+            color: selected ? theme.colorScheme.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+              color: selected ? Colors.white : theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ),
     );
   }
 
