@@ -53,6 +53,45 @@ class EmulatorService {
   EmulatorService(this._adbService);
   final AdbService _adbService;
 
+  Future<List<Emulator>> listPhysicalDevices({
+    required String adbPath,
+    required Set<String> favorites,
+    required Map<String, DateTime> lastLaunchByName,
+  }) async {
+    final connected = await _adbService.listConnectedDevices(adbPath);
+    final physicals = <Emulator>[];
+
+    for (final dev in connected) {
+      if (dev.isEmulator) continue;
+
+      final mfr = dev.manufacturer ?? '';
+      final model = dev.model ?? dev.serial;
+      final displayName = mfr.isNotEmpty && !model.toLowerCase().contains(mfr.toLowerCase())
+          ? '$mfr $model'
+          : model;
+
+      physicals.add(
+        Emulator(
+          name: displayName,
+          serial: dev.serial,
+          model: dev.model,
+          manufacturer: dev.manufacturer,
+          connectionType: dev.connectionType,
+          isPhysical: true,
+          status: dev.state == 'device'
+              ? EmulatorStatus.running
+              : (dev.state == 'unauthorized' ? EmulatorStatus.unauthorized : EmulatorStatus.offline),
+          androidVersion: dev.androidVersion != null ? 'Android ${dev.androidVersion}' : null,
+          apiLevel: dev.apiLevel,
+          deviceType: EmulatorDeviceType.phone,
+          isFavorite: favorites.contains(dev.serial) || favorites.contains(displayName),
+          lastUsedAt: lastLaunchByName[dev.serial],
+        ),
+      );
+    }
+    return physicals;
+  }
+
   Future<List<Emulator>> listAvds({
     required String emulatorPath,
     required String sdkPath,

@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tray/core/utils/platform_paths.dart';
+import 'package:tray/models/dashboard_statistics.dart';
+import 'package:tray/models/emulator.dart';
 import 'package:tray/services/emulator_service.dart';
 import 'package:tray/services/sdk_installer_service.dart';
 import 'package:tray/services/system_environment_service.dart';
@@ -50,6 +52,29 @@ void main() {
       } finally {
         tempDir.deleteSync(recursive: true);
       }
+    });
+
+    test('supports physical device models and statistics counting', () {
+      const physicalPhone = Emulator(
+        name: 'Samsung Galaxy S24',
+        serial: 'RFCW8012345',
+        isPhysical: true,
+        connectionType: 'USB',
+        status: EmulatorStatus.running,
+      );
+      const virtualEmu = Emulator(
+        name: 'Pixel_8',
+        status: EmulatorStatus.running,
+      );
+
+      expect(physicalPhone.isPhysical, isTrue);
+      expect(physicalPhone.serial, 'RFCW8012345');
+      expect(physicalPhone.isRunning, isTrue);
+
+      final stats = DashboardStatistics.fromEmulators([physicalPhone, virtualEmu]);
+      expect(stats.physical, 1);
+      expect(stats.installed, 1);
+      expect(stats.running, 2);
     });
   });
 

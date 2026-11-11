@@ -34,15 +34,30 @@ class EmulatorRepository {
   Future<List<Emulator>> listEmulators({
     required AndroidSdk sdk,
     required AppSettings settings,
-  }) {
-    if (!sdk.hasEmulator) return Future.value(const <Emulator>[]);
-    return emulatorService.listAvds(
-      emulatorPath: sdk.emulatorPath,
-      sdkPath: sdk.path,
-      favorites: settings.favoriteEmulators,
-      lastLaunchByName: settings.lastLaunchByName,
-      adbPath: sdk.adbPath,
-    );
+  }) async {
+    final physicalFuture = sdk.hasAdb
+        ? emulatorService.listPhysicalDevices(
+            adbPath: sdk.adbPath,
+            favorites: settings.favoriteEmulators,
+            lastLaunchByName: settings.lastLaunchByName,
+          )
+        : Future.value(const <Emulator>[]);
+
+    final avdsFuture = sdk.hasEmulator
+        ? emulatorService.listAvds(
+            emulatorPath: sdk.emulatorPath,
+            sdkPath: sdk.path,
+            favorites: settings.favoriteEmulators,
+            lastLaunchByName: settings.lastLaunchByName,
+            adbPath: sdk.adbPath,
+          )
+        : Future.value(const <Emulator>[]);
+
+    final results = await Future.wait([physicalFuture, avdsFuture]);
+    final physicals = results[0];
+    final avds = results[1];
+
+    return <Emulator>[...physicals, ...avds];
   }
 
   Future<int?> launch(AndroidSdk sdk, Emulator emulator, {bool coldBoot = false, int? port}) {

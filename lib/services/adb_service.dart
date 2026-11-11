@@ -1,6 +1,34 @@
 import 'dart:async';
 import 'dart:io';
 
+class AdbDeviceInfo {
+  const AdbDeviceInfo({
+    required this.serial,
+    required this.state,
+    this.model,
+    this.product,
+    this.device,
+    this.isEmulator = false,
+    this.androidVersion,
+    this.apiLevel,
+    this.manufacturer,
+    this.connectionType = 'USB',
+  });
+
+  final String serial;
+  final String state;
+  final String? model;
+  final String? product;
+  final String? device;
+  final bool isEmulator;
+  final String? androidVersion;
+  final int? apiLevel;
+  final String? manufacturer;
+  final String connectionType;
+
+  bool get isAuthorized => state == 'device';
+}
+
 class AdbService {
   Future<List<String>> devices(String adbPath) async {
     final result = await Process.run(adbPath, const <String>['devices'], runInShell: false)
@@ -16,6 +44,103 @@ class AdbService {
         .map((line) => line.trim())
         .where((line) => line.isNotEmpty)
         .toList(growable: false);
+  }
+
+  /// Lists all devices connected to ADB with parsed metadata.
+  /// Distinguishes between emulators and real physical devices.
+  Future<List<AdbDeviceInfo>> listConnectedDevices(String adbPath) async {
+    final devList = <AdbDeviceInfo>[];
+    try {
+      final result = await Process.run(
+        adbPath,
+        const <String>['devices', '-l'],
+        runInShell: false,
+      ).timeout(const Duration(seconds: 8));
+
+      if (result.exitCode != 0) return devList;
+
+      final lines = result.stdout
+          .toString()
+          .split(RegExp(r'\r?\n'))
+          .skip(1)
+          .map((line) => line.trim())
+          .where((line) => line.isNotEmpty);
+
+      for (final line in lines) {
+        final parts = line.split(RegExp(r'\s+'));
+        if (parts.length < 2) continue;
+
+        final serial = parts[0];
+        final state = parts[1];
+        final isEmu = serial.startsWith('emulator-');
+
+        String? model;
+        String? product;
+        String? device;
+
+        for (int i = 2; i < parts.length; i++) {
+          final part = parts[i];
+          if (part.startsWith('model:')) {
+            model = part.substring('model:'.length).replaceAll('_', ' ');
+          } else if (part.startsWith('product:')) {
+            product = part.substring('product:'.length);
+          } else if (part.startsWith('device:')) {
+            device = part.substring('device:'.length);
+          }
+        }
+
+        final connectionType = serial.contains(':') ? 'Wi-Fi' : 'USB';
+
+        String? androidVersion;
+        int? apiLevel;
+        String? manufacturer;
+
+        if (!isEmu && state == 'device') {
+          try {
+            final propRes = await Process.run(
+              adbPath,
+              <String>[
+                '-s',
+                serial,
+                'shell',
+                'getprop ro.product.model; getprop ro.product.manufacturer; getprop ro.build.version.release; getprop ro.build.version.sdk'
+              ],
+              runInShell: false,
+            ).timeout(const Duration(seconds: 3));
+
+            if (propRes.exitCode == 0) {
+              final propLines = propRes.stdout.toString().split(RegExp(r'\r?\n'));
+              if (propLines.isNotEmpty && propLines[0].trim().isNotEmpty) {
+                model = propLines[0].trim();
+              }
+              if (propLines.length > 1 && propLines[1].trim().isNotEmpty) {
+                manufacturer = propLines[1].trim();
+              }
+              if (propLines.length > 2 && propLines[2].trim().isNotEmpty) {
+                androidVersion = propLines[2].trim();
+              }
+              if (propLines.length > 3 && propLines[3].trim().isNotEmpty) {
+                apiLevel = int.tryParse(propLines[3].trim());
+              }
+            }
+          } catch (_) {}
+        }
+
+        devList.add(AdbDeviceInfo(
+          serial: serial,
+          state: state,
+          model: model,
+          product: product,
+          device: device,
+          isEmulator: isEmu,
+          androidVersion: androidVersion,
+          apiLevel: apiLevel,
+          manufacturer: manufacturer,
+          connectionType: connectionType,
+        ));
+      }
+    } catch (_) {}
+    return devList;
   }
 
   Future<String?> avdName(String adbPath, String serial) async {

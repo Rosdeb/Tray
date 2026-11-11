@@ -1,4 +1,4 @@
-enum EmulatorStatus { offline, booting, running, disconnected }
+enum EmulatorStatus { offline, booting, running, disconnected, unauthorized }
 
 enum EmulatorDeviceType { phone, tablet, foldable, wear, tv, automotive, unknown }
 
@@ -18,6 +18,11 @@ class Emulator {
     this.isFavorite = false,
     this.status = EmulatorStatus.offline,
     this.deviceType = EmulatorDeviceType.unknown,
+    this.isPhysical = false,
+    this.serial,
+    this.model,
+    this.manufacturer,
+    this.connectionType,
   });
 
   final String name;
@@ -34,9 +39,15 @@ class Emulator {
   final bool isFavorite;
   final EmulatorStatus status;
   final EmulatorDeviceType deviceType;
+  final bool isPhysical;
+  final String? serial;
+  final String? model;
+  final String? manufacturer;
+  final String? connectionType;
 
   bool get isRunning => status == EmulatorStatus.running;
   bool get isBooting => status == EmulatorStatus.booting;
+  bool get isUnauthorized => status == EmulatorStatus.unauthorized;
 
   Emulator copyWith({
     String? name,
@@ -53,6 +64,11 @@ class Emulator {
     bool? isFavorite,
     EmulatorStatus? status,
     EmulatorDeviceType? deviceType,
+    bool? isPhysical,
+    String? serial,
+    String? model,
+    String? manufacturer,
+    String? connectionType,
   }) {
     return Emulator(
       name: name ?? this.name,
@@ -69,6 +85,11 @@ class Emulator {
       isFavorite: isFavorite ?? this.isFavorite,
       status: status ?? this.status,
       deviceType: deviceType ?? this.deviceType,
+      isPhysical: isPhysical ?? this.isPhysical,
+      serial: serial ?? this.serial,
+      model: model ?? this.model,
+      manufacturer: manufacturer ?? this.manufacturer,
+      connectionType: connectionType ?? this.connectionType,
     );
   }
 }

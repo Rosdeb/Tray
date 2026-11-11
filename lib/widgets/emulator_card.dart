@@ -82,6 +82,36 @@ class EmulatorCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 10),
                       _StatusChip(status: emulator.status, isBooting: isBooting),
+                      if (emulator.isPhysical) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.teal.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.teal.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                emulator.connectionType == 'Wi-Fi' ? CupertinoIcons.wifi : CupertinoIcons.bolt_fill,
+                                size: 10,
+                                color: Colors.teal.shade700,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'PHYSICAL (${emulator.connectionType ?? "USB"})',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.teal.shade800,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       if (assignedPort != null) ...[
                         const SizedBox(width: 6),
                         Container(
@@ -103,8 +133,11 @@ class EmulatorCard extends StatelessWidget {
                     spacing: 8,
                     runSpacing: 6,
                     children: <Widget>[
+                      if (emulator.isPhysical && emulator.serial != null)
+                        _Meta(text: 'Serial: ${emulator.serial}'),
                       _Meta(text: emulator.androidVersion ?? 'Unknown Android'),
-                      _Meta(text: emulator.architecture ?? 'Unknown ABI'),
+                      if (emulator.apiLevel != null) _Meta(text: 'API ${emulator.apiLevel}'),
+                      if (emulator.architecture != null) _Meta(text: emulator.architecture!),
                       if (emulator.resolution != null) _Meta(text: emulator.resolution!),
                       if (emulator.ram != null) _Meta(text: emulator.ram!),
                     ],
@@ -119,79 +152,124 @@ class EmulatorCard extends StatelessWidget {
               icon: Icon(emulator.isFavorite ? CupertinoIcons.star_fill : CupertinoIcons.star),
             ),
 
-            // Mirror button (scrcpy)
-            if (emulator.isRunning && onMirror != null) ...[
-              OutlinedButton.icon(
-                onPressed: onMirror,
-                icon: const Icon(CupertinoIcons.tv, size: 16),
-                label: const Text('Mirror'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  visualDensity: VisualDensity.compact,
-                ),
-              ),
-              const SizedBox(width: 8),
-            ],
-
-            if (emulator.isRunning)
-              FilledButton.tonalIcon(
-                onPressed: onStop,
-                icon: const Icon(CupertinoIcons.stop_fill, color: Colors.red),
-                label: const Text('Stop', style: TextStyle(color: Colors.red)),
-              )
-            else
-              FilledButton.tonalIcon(
-                onPressed: isBooting || isLaunching ? null : onLaunch,
-                icon: isLaunching || isBooting
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(CupertinoIcons.play_fill),
-                label: Text(
-                  isLaunching
-                      ? 'Starting...'
-                      : isBooting
-                          ? 'Booting...'
-                          : 'Run',
-                ),
-              ),
-
-            const SizedBox(width: 8),
-            PopupMenuButton<String>(
-              tooltip: 'More actions',
-              onSelected: (value) {
-                switch (value) {
-                  case 'cold_boot':
-                    onColdBoot();
-                  case 'mirror':
-                    onMirror?.call();
-                  case 'stop':
-                    onStop();
-                  case 'details':
-                    _showDetails(context);
-                }
-              },
-              itemBuilder: (context) => <PopupMenuEntry<String>>[
-                const PopupMenuItem(
-                  value: 'cold_boot',
-                  child: Text('Cold boot (-no-snapshot-load)'),
-                ),
-                if (emulator.isRunning && onMirror != null)
-                  const PopupMenuItem(
-                    value: 'mirror',
-                    child: Text('Mirror screen with scrcpy'),
+            if (emulator.isPhysical) ...[
+              if (emulator.isUnauthorized) ...[
+                Tooltip(
+                  message: 'Please unlock your phone and tap "Allow" on the USB Debugging prompt',
+                  child: FilledButton.tonalIcon(
+                    onPressed: null,
+                    icon: const Icon(CupertinoIcons.exclamationmark_triangle_fill, color: Colors.amber, size: 16),
+                    label: const Text('Authorize on Phone', style: TextStyle(color: Colors.amber)),
                   ),
-                PopupMenuItem(
-                  value: 'stop',
-                  enabled: emulator.isRunning || isBooting,
-                  child: const Text('Stop (adb emu kill)'),
                 ),
-                const PopupMenuDivider(),
-                const PopupMenuItem(value: 'details', child: Text('View Details')),
+              ] else if (onMirror != null) ...[
+                FilledButton.icon(
+                  onPressed: onMirror,
+                  icon: const Icon(CupertinoIcons.tv, size: 16),
+                  label: const Text('Mirror Screen'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.teal.shade700,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
               ],
-            ),
+              const SizedBox(width: 8),
+              PopupMenuButton<String>(
+                tooltip: 'More actions',
+                onSelected: (value) {
+                  switch (value) {
+                    case 'mirror':
+                      onMirror?.call();
+                    case 'details':
+                      _showDetails(context);
+                  }
+                },
+                itemBuilder: (context) => <PopupMenuEntry<String>>[
+                  if (onMirror != null && !emulator.isUnauthorized)
+                    const PopupMenuItem(
+                      value: 'mirror',
+                      child: Text('Mirror screen with scrcpy'),
+                    ),
+                  const PopupMenuItem(value: 'details', child: Text('View Details')),
+                ],
+              ),
+            ] else ...[
+              // Mirror button (scrcpy) for virtual emulators
+              if (emulator.isRunning && onMirror != null) ...[
+                OutlinedButton.icon(
+                  onPressed: onMirror,
+                  icon: const Icon(CupertinoIcons.tv, size: 16),
+                  label: const Text('Mirror'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+
+              if (emulator.isRunning)
+                FilledButton.tonalIcon(
+                  onPressed: onStop,
+                  icon: const Icon(CupertinoIcons.stop_fill, color: Colors.red),
+                  label: const Text('Stop', style: TextStyle(color: Colors.red)),
+                )
+              else
+                FilledButton.tonalIcon(
+                  onPressed: isBooting || isLaunching ? null : onLaunch,
+                  icon: isLaunching || isBooting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(CupertinoIcons.play_fill),
+                  label: Text(
+                    isLaunching
+                        ? 'Starting...'
+                        : isBooting
+                            ? 'Booting...'
+                            : 'Run',
+                  ),
+                ),
+
+              const SizedBox(width: 8),
+              PopupMenuButton<String>(
+                tooltip: 'More actions',
+                onSelected: (value) {
+                  switch (value) {
+                    case 'cold_boot':
+                      onColdBoot();
+                    case 'mirror':
+                      onMirror?.call();
+                    case 'stop':
+                      onStop();
+                    case 'details':
+                      _showDetails(context);
+                  }
+                },
+                itemBuilder: (context) => <PopupMenuEntry<String>>[
+                  const PopupMenuItem(
+                    value: 'cold_boot',
+                    child: Text('Cold boot (-no-snapshot-load)'),
+                  ),
+                  if (emulator.isRunning && onMirror != null)
+                    const PopupMenuItem(
+                      value: 'mirror',
+                      child: Text('Mirror screen with scrcpy'),
+                    ),
+                  PopupMenuItem(
+                    value: 'stop',
+                    enabled: emulator.isRunning || isBooting,
+                    child: const Text('Stop (adb emu kill)'),
+                  ),
+                  const PopupMenuDivider(),
+                  const PopupMenuItem(value: 'details', child: Text('View Details')),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -199,6 +277,11 @@ class EmulatorCard extends StatelessWidget {
   }
 
   IconData _deviceIcon() {
+    if (emulator.isPhysical) {
+      return emulator.connectionType == 'Wi-Fi'
+          ? CupertinoIcons.wifi
+          : CupertinoIcons.device_phone_portrait;
+    }
     return switch (emulator.deviceType) {
       EmulatorDeviceType.tablet => CupertinoIcons.device_phone_landscape,
       EmulatorDeviceType.foldable => CupertinoIcons.device_phone_landscape,
@@ -221,6 +304,16 @@ class EmulatorCard extends StatelessWidget {
           children: <Widget>[
             Text(emulator.name, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
+            _DetailRow(
+              label: 'Type',
+              value: emulator.isPhysical
+                  ? 'Physical Device (${emulator.connectionType ?? "USB"})'
+                  : 'Android Virtual Device (AVD)',
+            ),
+            if (emulator.serial != null) _DetailRow(label: 'Serial', value: emulator.serial!),
+            if (emulator.model != null) _DetailRow(label: 'Model', value: emulator.model!),
+            if (emulator.manufacturer != null)
+              _DetailRow(label: 'Manufacturer', value: emulator.manufacturer!),
             _DetailRow(label: 'Status', value: emulator.status.name),
             if (assignedPort != null) _DetailRow(label: 'Port', value: assignedPort.toString()),
             _DetailRow(
@@ -244,7 +337,7 @@ class EmulatorCard extends StatelessWidget {
               label: 'Storage',
               value: emulator.internalStorage ?? 'Unknown',
             ),
-            _DetailRow(label: 'Path', value: emulator.path ?? 'Unknown'),
+            if (emulator.path != null) _DetailRow(label: 'Path', value: emulator.path!),
             if (emulator.createdAt != null)
               _DetailRow(
                 label: 'Created',
@@ -300,6 +393,7 @@ class _StatusChip extends StatelessWidget {
       EmulatorStatus.running => Colors.green,
       EmulatorStatus.booting => Colors.orange,
       EmulatorStatus.disconnected => Colors.red,
+      EmulatorStatus.unauthorized => Colors.amber.shade800,
       EmulatorStatus.offline => Theme.of(context).colorScheme.outline,
     };
 

@@ -434,14 +434,19 @@ class EmulatorController extends AsyncNotifier<EmulatorState> {
     final sdk = state.value?.sdk;
     if (sdk == null) return;
 
-    final serial = await ref.read(adbServiceProvider).findSerialForAvd(sdk.adbPath, emulator.name);
+    final String? serial;
+    if (emulator.isPhysical) {
+      serial = emulator.serial ?? emulator.name;
+    } else {
+      serial = await ref.read(adbServiceProvider).findSerialForAvd(sdk.adbPath, emulator.name);
+    }
     if (serial == null) return;
 
     final settings = ref.read(settingsControllerProvider);
 
     await ref.read(scrcpyServiceProvider).startMirror(
       serial: serial,
-      windowTitle: '${emulator.name} (AEM Mirror)',
+      windowTitle: '${emulator.name} (Simulation Tray)',
       customPath: settings.scrcpyPath,
       sdkPath: sdk.path,
       adbPath: sdk.adbPath,

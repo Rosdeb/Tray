@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,10 +9,11 @@ import '../../providers/app_providers.dart';
 import '../../widgets/create_avd_dialog.dart';
 import '../../widgets/emulator_card.dart';
 import '../../widgets/hardware_accel_banner.dart';
+import '../../widgets/scrcpy_install_dialog.dart';
 import '../../widgets/sdk_setup_dialog.dart';
 import '../../widgets/stat_tile.dart';
 
-enum EmulatorFilter { all, running, offline, favorites }
+enum EmulatorFilter { all, running, physical, offline, favorites }
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -90,14 +93,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 28),
                 sliver: SliverGrid.count(
-                  crossAxisCount: 4,
+                  crossAxisCount: 5,
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 12,
-                  childAspectRatio: 2.8,
+                  childAspectRatio: 2.3,
                   children: <Widget>[
                     StatTile(
-                      label: 'Installed',
+                      label: 'Installed AVDs',
                       value: data.statistics.installed.toString(),
+                      icon: CupertinoIcons.layers_alt,
+                    ),
+                    StatTile(
+                      label: 'Physical Devices',
+                      value: data.statistics.physical.toString(),
                       icon: CupertinoIcons.device_phone_portrait,
                     ),
                     StatTile(
@@ -170,7 +178,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         onLaunch: () => ref.read(emulatorControllerProvider.notifier).launch(emulator),
                         onColdBoot: () => ref.read(emulatorControllerProvider.notifier).launch(emulator, coldBoot: true),
                         onStop: () => ref.read(emulatorControllerProvider.notifier).stop(emulator),
-                        onMirror: () => ref.read(emulatorControllerProvider.notifier).mirrorWithScrcpy(emulator),
+                        onMirror: () => _handleMirror(context, emulator),
                       );
                     },
                   ),
@@ -180,6 +188,54 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         );
       },
     ));
+  }
+
+  Future<void> _handleMirror(BuildContext context, Emulator emulator) async {
+    final scrcpyInfo = await ref.read(scrcpyInfoProvider.future);
+    if (!scrcpyInfo.isAvailable) {
+      if (!context.mounted) return;
+      final shouldInstall = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(CupertinoIcons.tv, size: 22),
+              SizedBox(width: 10),
+              Text('scrcpy Required'),
+            ],
+          ),
+          content: Text(
+            Platform.isWindows
+                ? 'Screen mirroring requires scrcpy, which was not found on your system.\n\nWould you like Tray to automatically download and install official standalone scrcpy now (~6.6 MB)?'
+                : 'Screen mirroring requires scrcpy. Please install scrcpy (brew install scrcpy) or configure its path in Settings.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            if (Platform.isWindows)
+              FilledButton.icon(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                icon: const Icon(CupertinoIcons.cloud_download, size: 16),
+                label: const Text('Install Automatically'),
+              ),
+          ],
+        ),
+      );
+
+      if (shouldInstall == true && context.mounted) {
+        await ScrcpyInstallDialog.show(
+          context,
+          onSuccess: () {
+            ref.read(emulatorControllerProvider.notifier).mirrorWithScrcpy(emulator);
+          },
+        );
+      }
+      return;
+    }
+
+    ref.read(emulatorControllerProvider.notifier).mirrorWithScrcpy(emulator);
   }
 
   List<Emulator> _applyFilters(List<Emulator> emulators) {
@@ -193,7 +249,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       final matchesFilter = switch (_filter) {
         EmulatorFilter.all => true,
         EmulatorFilter.running => emulator.status == EmulatorStatus.running,
-        EmulatorFilter.offline => emulator.status == EmulatorStatus.offline,
+        EmulatorFilter.physical => emulator.isPhysical,
+        EmulatorFilter.offline => emulator.status == EmulatorStatus.offline && !emulator.isPhysical,
         EmulatorFilter.favorites => emulator.isFavorite,
       };
       return matchesQuery && matchesFilter;
@@ -398,6 +455,7 @@ class _Toolbar extends StatelessWidget {
           segments: const <ButtonSegment<EmulatorFilter>>[
             ButtonSegment(value: EmulatorFilter.all, label: Text('All')),
             ButtonSegment(value: EmulatorFilter.running, label: Text('Running')),
+            ButtonSegment(value: EmulatorFilter.physical, label: Text('Physical')),
             ButtonSegment(value: EmulatorFilter.offline, label: Text('Offline')),
             ButtonSegment(value: EmulatorFilter.favorites, label: Text('Favorites')),
           ],

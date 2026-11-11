@@ -9,6 +9,7 @@ import '../../core/utils/platform_paths.dart';
 import '../../providers/app_providers.dart';
 import '../../services/system_environment_service.dart';
 import '../../widgets/process_manager_section.dart';
+import '../../widgets/scrcpy_install_dialog.dart';
 import '../../widgets/sdk_setup_dialog.dart';
 import '../../widgets/setting_switch_tile.dart';
 
@@ -637,7 +638,9 @@ class SettingsScreen extends ConsumerWidget {
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                'Need scrcpy? Download the standalone package for Windows from GitHub releases or run "winget install scrcpy".',
+                                Platform.isWindows
+                                    ? 'Need scrcpy? Install the official standalone package automatically with 1-click or choose your custom executable.'
+                                    : 'Need scrcpy? Install via brew (brew install scrcpy) or choose your custom binary path.',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Theme.of(innerContext).colorScheme.onSurfaceVariant,
@@ -645,13 +648,23 @@ class SettingsScreen extends ConsumerWidget {
                               ),
                             ),
                             const SizedBox(width: 10),
-                            FilledButton.tonalIcon(
-                              onPressed: () => SystemEnvironmentService.openScrcpyDownloadPage(),
-                              icon: const Icon(CupertinoIcons.arrow_down_circle, size: 16),
-                              label: const Text('Get scrcpy'),
+                            FilledButton.icon(
+                              onPressed: () => ScrcpyInstallDialog.show(innerContext),
+                              icon: const Icon(CupertinoIcons.cloud_download, size: 16),
+                              label: const Text('Install scrcpy (1-Click)'),
                               style: FilledButton.styleFrom(
                                 visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            OutlinedButton.icon(
+                              onPressed: () => SystemEnvironmentService.openScrcpyDownloadPage(),
+                              icon: const Icon(CupertinoIcons.arrow_up_right, size: 14),
+                              label: const Text('Releases'),
+                              style: OutlinedButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                               ),
                             ),
                           ],
