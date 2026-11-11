@@ -101,6 +101,7 @@ class EmulatorRepository {
     required String systemImage,
     String device = 'pixel_7',
     int ramMb = 4096,
+    void Function(String progress)? onProgress,
   }) async {
     final avdManager = sdk.avdManagerPath;
     if (avdManager == null) {
@@ -111,6 +112,23 @@ class EmulatorRepository {
       throw StateError('Java 17+ home not found. Please setup JDK 17.');
     }
 
+    // Auto-download system image if not yet present on disk
+    final isInstalled = sdkInstallerService.isSystemImageInstalled(
+      sdkRoot: sdk.path,
+      systemImagePkg: systemImage,
+    );
+
+    if (!isInstalled) {
+      onProgress?.call('Downloading system image ($systemImage)...');
+      await sdkInstallerService.installSystemImagePackage(
+        sdkRoot: sdk.path,
+        javaHome: javaHome,
+        package: systemImage,
+        onProgress: onProgress,
+      );
+    }
+
+    onProgress?.call('Creating virtual device hardware profile...');
     await sdkInstallerService.createCustomAvd(
       avdManagerPath: avdManager,
       javaHome: javaHome,

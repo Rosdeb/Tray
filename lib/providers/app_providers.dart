@@ -404,6 +404,7 @@ class EmulatorController extends AsyncNotifier<EmulatorState> {
     required String systemImage,
     String device = 'pixel_7',
     int ramMb = 4096,
+    void Function(String progress)? onProgress,
   }) async {
     final sdk = state.value?.sdk;
     if (sdk == null) {
@@ -416,6 +417,7 @@ class EmulatorController extends AsyncNotifier<EmulatorState> {
       systemImage: systemImage,
       device: device,
       ramMb: ramMb,
+      onProgress: onProgress,
     );
 
     await refresh();

@@ -487,7 +487,9 @@ ANDROID SOFTWARE DEVELOPMENT KIT TERMS AND CONDITIONS
     final finalAvdName = avdName ?? 'Pixel_7_API_$apiLevel';
     addLog('Creating AVD: $finalAvdName with image $systemImagePkg');
 
-    final createAvdProcess = await Process.run(
+    // Launch avdmanager and pipe 'no' to stdin so it doesn't hang on:
+    // "Do you wish to create a custom hardware profile? [no]"
+    final createAvdProc = await Process.start(
       canonicalAvdManager.path,
       [
         'create',
@@ -504,9 +506,27 @@ ANDROID SOFTWARE DEVELOPMENT KIT TERMS AND CONDITIONS
       runInShell: Platform.isWindows,
     );
 
-    addLog(createAvdProcess.stdout.toString().trim());
-    if (createAvdProcess.exitCode != 0 && createAvdProcess.stderr.toString().isNotEmpty) {
-      addLog('avdmanager notice: ${createAvdProcess.stderr.toString().trim()}');
+    // Bypass interactive hardware profile prompt immediately
+    createAvdProc.stdin.writeln('no');
+    await createAvdProc.stdin.flush();
+    await createAvdProc.stdin.close();
+
+    final stdoutBuf = StringBuffer();
+    final stderrBuf = StringBuffer();
+    createAvdProc.stdout.transform(utf8.decoder).listen((data) => stdoutBuf.write(data));
+    createAvdProc.stderr.transform(utf8.decoder).listen((data) => stderrBuf.write(data));
+
+    final avdExitCode = await createAvdProc.exitCode.timeout(
+      const Duration(minutes: 2),
+      onTimeout: () {
+        createAvdProc.kill();
+        return -1;
+      },
+    );
+
+    addLog(stdoutBuf.toString().trim());
+    if (avdExitCode != 0 && stderrBuf.isNotEmpty) {
+      addLog('avdmanager notice: ${stderrBuf.toString().trim()}');
     }
 
     // Write optimal config.ini
@@ -541,6 +561,104 @@ ANDROID SOFTWARE DEVELOPMENT KIT TERMS AND CONDITIONS
     );
   }
 
+  /// Locates the `sdkmanager` executable within the given SDK root.
+  File? findSdkManager(String sdkRoot) {
+    final exe = Platform.isWindows ? 'sdkmanager.bat' : 'sdkmanager';
+    final candidates = [
+      p.join(sdkRoot, 'cmdline-tools', 'latest', 'bin', exe),
+      p.join(sdkRoot, 'cmdline-tools', 'bin', exe),
+      p.join(sdkRoot, 'tools', 'bin', exe),
+    ];
+    for (final c in candidates) {
+      final f = File(c);
+      if (f.existsSync()) return f;
+    }
+    final cmdlineDir = Directory(p.join(sdkRoot, 'cmdline-tools'));
+    if (cmdlineDir.existsSync()) {
+      try {
+        for (final entry in cmdlineDir.listSync()) {
+          if (entry is Directory) {
+            final f = File(p.join(entry.path, 'bin', exe));
+            if (f.existsSync()) return f;
+          }
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  /// Checks if a system image package is already downloaded on disk in the SDK.
+  /// Format: `system-images;android-<api>;google_apis;<abi>`
+  bool isSystemImageInstalled({
+    required String sdkRoot,
+    required String systemImagePkg,
+  }) {
+    final parts = systemImagePkg.split(';');
+    if (parts.length >= 4) {
+      final apiFolder = parts[1];
+      final variantFolder = parts[2];
+      final abiFolder = parts[3];
+      final dir = Directory(p.join(sdkRoot, 'system-images', apiFolder, variantFolder, abiFolder));
+      return dir.existsSync();
+    }
+    return false;
+  }
+
+  /// Downloads and installs a system image package using `sdkmanager` without Android Studio.
+  Future<void> installSystemImagePackage({
+    required String sdkRoot,
+    required String javaHome,
+    required String package,
+    void Function(String message)? onProgress,
+  }) async {
+    final sdkManagerFile = findSdkManager(sdkRoot);
+    if (sdkManagerFile == null) {
+      throw StateError('sdkmanager executable not found in $sdkRoot');
+    }
+
+    final env = Map<String, String>.from(Platform.environment);
+    env['JAVA_HOME'] = javaHome;
+    env['ANDROID_HOME'] = sdkRoot;
+    env['ANDROID_SDK_ROOT'] = sdkRoot;
+
+    // Ensure licenses are accepted
+    await writeSdkLicenses(Directory(sdkRoot));
+
+    onProgress?.call('Starting download of $package via sdkmanager...');
+    final proc = await Process.start(
+      sdkManagerFile.path,
+      [
+        '--install',
+        package,
+        '--sdk_root=$sdkRoot',
+      ],
+      environment: env,
+      runInShell: Platform.isWindows,
+    );
+
+    proc.stdin.writeln('y');
+    await proc.stdin.flush();
+    await proc.stdin.close();
+
+    final lines = proc.stdout.transform(utf8.decoder).transform(const LineSplitter());
+    await for (final line in lines) {
+      final trimmed = line.trim();
+      if (trimmed.isNotEmpty) {
+        onProgress?.call(trimmed);
+      }
+    }
+
+    final exitCode = await proc.exitCode;
+    if (exitCode != 0) {
+      throw ProcessException(
+        sdkManagerFile.path,
+        ['--install', package],
+        'sdkmanager install failed with exit code $exitCode',
+        exitCode,
+      );
+    }
+  }
+
   /// Create an AVD manually using avdmanager.
   Future<void> createCustomAvd({
     required String avdManagerPath,
@@ -556,7 +674,7 @@ ANDROID SOFTWARE DEVELOPMENT KIT TERMS AND CONDITIONS
     env['ANDROID_HOME'] = sdkRoot;
     env['ANDROID_SDK_ROOT'] = sdkRoot;
 
-    final result = await Process.run(
+    final proc = await Process.start(
       avdManagerPath,
       [
         'create',
@@ -573,8 +691,29 @@ ANDROID SOFTWARE DEVELOPMENT KIT TERMS AND CONDITIONS
       runInShell: Platform.isWindows,
     );
 
-    if (result.exitCode != 0) {
-      throw ProcessException(avdManagerPath, ['create', 'avd'], result.stderr.toString(), result.exitCode);
+    // Bypass interactive hardware profile question
+    proc.stdin.writeln('no');
+    await proc.stdin.flush();
+    await proc.stdin.close();
+
+    final stdoutBuf = StringBuffer();
+    final stderrBuf = StringBuffer();
+    proc.stdout.transform(utf8.decoder).listen((data) => stdoutBuf.write(data));
+    proc.stderr.transform(utf8.decoder).listen((data) => stderrBuf.write(data));
+
+    final exitCode = await proc.exitCode.timeout(
+      const Duration(minutes: 2),
+      onTimeout: () {
+        proc.kill();
+        return -1;
+      },
+    );
+
+    if (exitCode != 0) {
+      final err = stderrBuf.toString().trim().isNotEmpty
+          ? stderrBuf.toString().trim()
+          : stdoutBuf.toString().trim();
+      throw ProcessException(avdManagerPath, ['create', 'avd'], err, exitCode);
     }
 
     // Enhance config.ini
