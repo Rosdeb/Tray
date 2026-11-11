@@ -217,11 +217,51 @@ class UpdateService {
         mode: ProcessStartMode.detached,
       );
     } else if (Platform.isMacOS) {
-      await Process.start(
-        'open',
-        [installerPath],
-        mode: ProcessStartMode.detached,
-      );
+      bool updatedInPlace = false;
+      try {
+        final mountDir = Directory('/tmp/tray_dmg_mount');
+        if (mountDir.existsSync()) {
+          await Process.run('hdiutil', ['detach', mountDir.path, '-force']);
+        }
+        await mountDir.create(recursive: true);
+
+        final attachRes = await Process.run('hdiutil', [
+          'attach',
+          installerPath,
+          '-nobrowse',
+          '-mountpoint',
+          mountDir.path,
+        ]);
+
+        if (attachRes.exitCode == 0) {
+          final entries = mountDir.listSync();
+          final appEntity = entries.firstWhere(
+            (e) => e.path.endsWith('.app'),
+            orElse: () => File(''),
+          );
+
+          if (appEntity.existsSync()) {
+            const targetAppPath = '/Applications/Tray.app';
+            await Process.run('rm', ['-rf', targetAppPath]);
+            final cpRes = await Process.run('cp', ['-R', appEntity.path, '/Applications/']);
+            await Process.run('hdiutil', ['detach', mountDir.path, '-force']);
+
+            if (cpRes.exitCode == 0) {
+              updatedInPlace = true;
+              await Process.start('open', ['-n', targetAppPath], mode: ProcessStartMode.detached);
+            }
+          }
+        }
+      } catch (_) {}
+
+      if (!updatedInPlace) {
+        // Fallback: mount and reveal the DMG Finder window
+        await Process.start(
+          'open',
+          [installerPath],
+          mode: ProcessStartMode.detached,
+        );
+      }
     }
 
     await Future.delayed(const Duration(milliseconds: 500));

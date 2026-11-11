@@ -34,7 +34,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
     _trayService = ref.read(trayServiceProvider);
     _initializeTray();
 
-    if (Platform.isWindows) {
+    if (Platform.isWindows || Platform.isMacOS) {
       windowManager.addListener(this);
       windowManager.setPreventClose(true);
     }
@@ -128,7 +128,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
 
   @override
   Future<void> onWindowClose() async {
-    if (_allowClose || !Platform.isWindows) return;
+    if (_allowClose || (!Platform.isWindows && !Platform.isMacOS)) return;
 
     final settings = ref.read(settingsControllerProvider);
 
@@ -142,7 +142,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
 
   @override
   void dispose() {
-    if (Platform.isWindows) {
+    if (Platform.isWindows || Platform.isMacOS) {
       windowManager.removeListener(this);
     }
 
@@ -201,6 +201,12 @@ class _HomeShellState extends ConsumerState<HomeShell>
                         ],
                       ),
                     ),
+                  )
+                else if (Platform.isMacOS)
+                  const DragToMoveArea(
+                    child: SizedBox(
+                      height: 32,
+                    ),
                   ),
 
                 Expanded(
@@ -257,7 +263,12 @@ class AppSidebar extends ConsumerWidget {
       color: colorScheme.surface,
       child: Column(
         children: [
-          const SizedBox(height: 4),
+          if (Platform.isMacOS)
+            const DragToMoveArea(
+              child: SizedBox(height: 28),
+            )
+          else
+            const SizedBox(height: 4),
           Row(
             children: [
               const SizedBox(width: 12),

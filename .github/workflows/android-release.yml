@@ -101,10 +101,10 @@ jobs:
       # Install create-dmg
       - run: brew install create-dmg
 
-      # Create DMG
-      - name: Build DMG
+      # Create DMG and Zip
+      - name: Build DMG & Zip
         run: |
-          mkdir dmg
+          mkdir -p dmg
           cp -R build/macos/Build/Products/Release/*.app dmg/
 
           create-dmg \
@@ -114,8 +114,18 @@ jobs:
             --icon-size 100 \
             --app-drop-link 600 185 \
             Tray.dmg \
-            dmg/
+            dmg/ || true
+
+          if [ ! -f Tray.dmg ]; then
+            hdiutil create -volname "Tray" -srcfolder dmg -ov -format UDZO Tray.dmg
+          fi
+
+          cd build/macos/Build/Products/Release
+          zip -r -y ../../../../Tray-macOS.zip *.app
+          cd ../../../..
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: Tray.dmg
+          files: |
+            Tray.dmg
+            Tray-macOS.zip

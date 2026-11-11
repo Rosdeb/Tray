@@ -46,14 +46,18 @@ class AppTrayService with TrayListener, WindowListener {
     trayManager.addListener(this);
 
     try {
-      final iconAsset = Platform.isWindows ? "assets/icons/app_icon.ico" : "assets/icons/tray.png";
-      final iconExt = Platform.isWindows ? "ico" : "png";
-      final icon = await rootBundle.load(iconAsset);
-
-      final temp = File("${Directory.systemTemp.path}/app_icon.$iconExt");
-      await temp.writeAsBytes(icon.buffer.asUint8List());
-
-      await trayManager.setIcon(temp.path);
+      if (Platform.isWindows) {
+        final icon = await rootBundle.load("assets/icons/app_icon.ico");
+        final temp = File("${Directory.systemTemp.path}/app_icon.ico");
+        await temp.writeAsBytes(icon.buffer.asUint8List());
+        await trayManager.setIcon(temp.path);
+      } else if (Platform.isMacOS) {
+        // On macOS, tray_manager loads directly via rootBundle.load(iconPath)
+        await trayManager.setIcon(
+          "assets/icons/tray.png",
+          isTemplate: true,
+        );
+      }
       await trayManager.setToolTip("Simulation Tray");
 
       await updateMenu(

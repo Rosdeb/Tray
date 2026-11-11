@@ -13,12 +13,14 @@ import 'screens/home_shell.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  if (Platform.isWindows) {
+  if (Platform.isWindows || Platform.isMacOS) {
     await windowManager.ensureInitialized();
-    const windowOptions = WindowOptions(
-      size: Size(988, 545),
-      minimumSize: Size(988, 545),
-      maximumSize: Size(988, 545),
+    // Slightly larger dimensions on macOS for comfortable system font rendering and traffic lights
+    final windowSize = Platform.isMacOS ? const Size(1020, 565) : const Size(988, 545);
+    final windowOptions = WindowOptions(
+      size: windowSize,
+      minimumSize: windowSize,
+      maximumSize: windowSize,
       center: true,
       backgroundColor: Colors.transparent,
       skipTaskbar: false,
