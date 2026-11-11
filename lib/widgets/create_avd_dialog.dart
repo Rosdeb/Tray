@@ -775,17 +775,18 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
                   const SizedBox(height: 6),
                   DropdownButtonFormField<int>(
                     initialValue: _ramMb,
+                    isExpanded: true,
                     isDense: true,
                     decoration: InputDecoration(
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     ),
                     items: const [
-                      DropdownMenuItem(value: 2048, child: Text('2 GB (Light)')),
-                      DropdownMenuItem(value: 4096, child: Text('4 GB (Recommended)')),
-                      DropdownMenuItem(value: 6144, child: Text('6 GB (Fast)')),
-                      DropdownMenuItem(value: 8192, child: Text('8 GB (High Performance)')),
-                      DropdownMenuItem(value: 12288, child: Text('12 GB (Heavy Multitask)')),
+                      DropdownMenuItem(value: 2048, child: Text('2 GB', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 4096, child: Text('4 GB (Recommended)', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 6144, child: Text('6 GB', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 8192, child: Text('8 GB (High Perf)', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 12288, child: Text('12 GB', overflow: TextOverflow.ellipsis)),
                     ],
                     onChanged: (val) {
                       if (val != null) setState(() => _ramMb = val);
@@ -794,7 +795,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
                 ],
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -803,16 +804,17 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
                   const SizedBox(height: 6),
                   DropdownButtonFormField<int>(
                     initialValue: _cpuCores,
+                    isExpanded: true,
                     isDense: true,
                     decoration: InputDecoration(
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     ),
                     items: const [
-                      DropdownMenuItem(value: 2, child: Text('2 Cores')),
-                      DropdownMenuItem(value: 4, child: Text('4 Cores (Recommended)')),
-                      DropdownMenuItem(value: 6, child: Text('6 Cores')),
-                      DropdownMenuItem(value: 8, child: Text('8 Cores (Ultra)')),
+                      DropdownMenuItem(value: 2, child: Text('2 Cores', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 4, child: Text('4 Cores (Recommended)', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 6, child: Text('6 Cores', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 8, child: Text('8 Cores', overflow: TextOverflow.ellipsis)),
                     ],
                     onChanged: (val) {
                       if (val != null) setState(() => _cpuCores = val);
@@ -836,16 +838,17 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
                   const SizedBox(height: 6),
                   DropdownButtonFormField<int>(
                     initialValue: _internalStorageMb,
+                    isExpanded: true,
                     isDense: true,
                     decoration: InputDecoration(
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     ),
                     items: const [
-                      DropdownMenuItem(value: 8192, child: Text('8 GB')),
-                      DropdownMenuItem(value: 16384, child: Text('16 GB (Recommended)')),
-                      DropdownMenuItem(value: 32768, child: Text('32 GB')),
-                      DropdownMenuItem(value: 65536, child: Text('64 GB (Large)')),
+                      DropdownMenuItem(value: 8192, child: Text('8 GB', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 16384, child: Text('16 GB (Recommended)', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 32768, child: Text('32 GB', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 65536, child: Text('64 GB', overflow: TextOverflow.ellipsis)),
                     ],
                     onChanged: (val) {
                       if (val != null) setState(() => _internalStorageMb = val);
@@ -854,7 +857,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
                 ],
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -863,15 +866,16 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
                   const SizedBox(height: 6),
                   DropdownButtonFormField<String>(
                     initialValue: _gpuMode,
+                    isExpanded: true,
                     isDense: true,
                     decoration: InputDecoration(
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     ),
                     items: const [
-                      DropdownMenuItem(value: 'auto', child: Text('Auto (Hardware Accelerated)')),
-                      DropdownMenuItem(value: 'host', child: Text('Host GPU (Native Passthrough)')),
-                      DropdownMenuItem(value: 'swiftshader_indirect', child: Text('Software (SwiftShader)')),
+                      DropdownMenuItem(value: 'auto', child: Text('Auto (Hardware)', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 'host', child: Text('Host GPU (Native)', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 'swiftshader_indirect', child: Text('Software (SwiftShader)', overflow: TextOverflow.ellipsis)),
                     ],
                     onChanged: (val) {
                       if (val != null) setState(() => _gpuMode = val);
