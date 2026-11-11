@@ -47,10 +47,27 @@ class SystemEnvironmentService {
     return 'x86_64';
   }
 
-  /// Checks hardware acceleration status.
+  HardwareAccelerationInfo? _cachedAccelInfo;
+  String? _lastCheckedEmulatorPath;
+
+  /// Invalidate cached acceleration info to force a fresh re-check.
+  void invalidateHardwareAccelerationCache() {
+    _cachedAccelInfo = null;
+    _lastCheckedEmulatorPath = null;
+  }
+
+  /// Checks hardware acceleration status. Results are cached to prevent CPU-intensive
+  /// process spawning during periodic background refresh cycles.
   Future<HardwareAccelerationInfo> checkHardwareAcceleration({
     String? emulatorPath,
+    bool forceRefresh = false,
   }) async {
+    if (!forceRefresh && _cachedAccelInfo != null && _lastCheckedEmulatorPath == emulatorPath) {
+      return _cachedAccelInfo!;
+    }
+
+    HardwareAccelerationInfo resultInfo;
+
     // 1. If emulator binary exists, run emulator -accel-check
     if (emulatorPath != null && await File(emulatorPath).exists()) {
       try {
@@ -80,14 +97,20 @@ class SystemEnvironmentService {
             hypervisor = 'Linux KVM';
           }
 
-          return HardwareAccelerationInfo(
+          resultInfo = HardwareAccelerationInfo(
             status: AccelerationStatus.available,
             message: 'Hardware acceleration is active ($hypervisor).',
             details: result.stdout.toString().trim(),
             hypervisorType: hypervisor,
           );
+          _cachedAccelInfo = resultInfo;
+          _lastCheckedEmulatorPath = emulatorPath;
+          return resultInfo;
         } else {
-          return _buildUnavailableInfo(details: out);
+          resultInfo = _buildUnavailableInfo(details: out);
+          _cachedAccelInfo = resultInfo;
+          _lastCheckedEmulatorPath = emulatorPath;
+          return resultInfo;
         }
       } catch (e) {
         // Fall back to platform checks
@@ -97,29 +120,27 @@ class SystemEnvironmentService {
     // 2. Pre-emulator heuristic checks based on OS
     if (Platform.isMacOS) {
       // macOS Hypervisor.framework is built into macOS
-      return const HardwareAccelerationInfo(
+      resultInfo = const HardwareAccelerationInfo(
         status: AccelerationStatus.available,
         message: 'macOS Hypervisor.framework is ready.',
         details: 'Apple Hypervisor is built into macOS.',
         hypervisorType: 'Hypervisor.framework',
       );
-    }
-
-    if (Platform.isLinux) {
+    } else if (Platform.isLinux) {
       final kvm = File('/dev/kvm');
       if (await kvm.exists()) {
         try {
           // Check read/write permission
           final raf = await kvm.open(mode: FileMode.read);
           await raf.close();
-          return const HardwareAccelerationInfo(
+          resultInfo = const HardwareAccelerationInfo(
             status: AccelerationStatus.available,
             message: 'Linux KVM acceleration is ready (/dev/kvm).',
             details: '/dev/kvm exists and is accessible.',
             hypervisorType: 'KVM',
           );
         } catch (_) {
-          return const HardwareAccelerationInfo(
+          resultInfo = const HardwareAccelerationInfo(
             status: AccelerationStatus.unavailable,
             message: 'Linux KVM permission denied for /dev/kvm.',
             details: 'Current user cannot access /dev/kvm.',
@@ -128,7 +149,7 @@ class SystemEnvironmentService {
           );
         }
       } else {
-        return const HardwareAccelerationInfo(
+        resultInfo = const HardwareAccelerationInfo(
           status: AccelerationStatus.unavailable,
           message: 'Linux KVM device (/dev/kvm) not found.',
           details: 'Virtualization may be disabled in BIOS or KVM module not loaded.',
@@ -136,24 +157,26 @@ class SystemEnvironmentService {
           howToFix: 'Enable Virtualization (VT-x / AMD-V) in BIOS, then run: sudo apt install qemu-kvm && sudo modprobe kvm',
         );
       }
-    }
-
-    if (Platform.isWindows) {
+    } else if (Platform.isWindows) {
       // Check Windows Hypervisor Platform
-      return const HardwareAccelerationInfo(
+      resultInfo = const HardwareAccelerationInfo(
         status: AccelerationStatus.unknown,
         message: 'Windows Hypervisor Platform (WHPX) or AEHD is required.',
         details: 'Requires WHPX feature enabled in Windows or AEHD driver for AMD/Intel.',
         hypervisorType: 'WHPX / AEHD',
         howToFix: 'Enable "Windows Hypervisor Platform" in "Turn Windows features on or off", or install the AEHD driver.',
       );
+    } else {
+      resultInfo = const HardwareAccelerationInfo(
+        status: AccelerationStatus.unknown,
+        message: 'Acceleration check pending emulator installation.',
+        details: 'Run accel-check after emulator is installed.',
+      );
     }
 
-    return const HardwareAccelerationInfo(
-      status: AccelerationStatus.unknown,
-      message: 'Acceleration check pending emulator installation.',
-      details: 'Run accel-check after emulator is installed.',
-    );
+    _cachedAccelInfo = resultInfo;
+    _lastCheckedEmulatorPath = emulatorPath;
+    return resultInfo;
   }
 
   HardwareAccelerationInfo _buildUnavailableInfo({required String details}) {

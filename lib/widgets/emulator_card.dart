@@ -30,29 +30,30 @@ class EmulatorCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isBooting = emulator.isBooting;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: emulator.isRunning
-              ? Colors.green.withValues(alpha: 0.4)
-              : isBooting
-                  ? Colors.orange.withValues(alpha: 0.4)
-                  : Theme.of(context).dividerColor,
-        ),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 12,
-            color: Colors.black.withValues(alpha: 0.04),
-            offset: const Offset(0, 4),
+    return RepaintBoundary(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: emulator.isRunning
+                ? Colors.green.withValues(alpha: 0.4)
+                : isBooting
+                    ? Colors.orange.withValues(alpha: 0.4)
+                    : Theme.of(context).dividerColor,
           ),
-        ],
-      ),
-      child: InkWell(
-        onTap: () => _showDetails(context),
-        child: Row(
+          boxShadow: [
+            BoxShadow(
+              blurRadius: 12,
+              color: Colors.black.withValues(alpha: 0.04),
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: InkWell(
+          onTap: () => _showDetails(context),
+          child: Row(
           children: <Widget>[
             CircleAvatar(
               radius: 26,
@@ -272,6 +273,7 @@ class EmulatorCard extends StatelessWidget {
             ],
           ],
         ),
+      ),
       ),
     );
   }

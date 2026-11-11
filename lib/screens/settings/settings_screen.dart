@@ -131,6 +131,7 @@ class SettingsScreen extends ConsumerWidget {
                 const SizedBox(width: 12),
                 OutlinedButton.icon(
                   onPressed: () {
+                    ref.read(systemEnvironmentServiceProvider).invalidateHardwareAccelerationCache();
                     ref.invalidate(hardwareAccelerationProvider);
                     ref.invalidate(scrcpyInfoProvider);
                     ref.read(emulatorControllerProvider.notifier).refresh();

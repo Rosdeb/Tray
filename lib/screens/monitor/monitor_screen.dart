@@ -6,11 +6,35 @@ import '../../models/device_metrics.dart';
 import '../../providers/app_providers.dart';
 import '../../widgets/monitor_sparkline_painter.dart';
 
-class MonitorScreen extends ConsumerWidget {
+class MonitorScreen extends ConsumerStatefulWidget {
   const MonitorScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MonitorScreen> createState() => _MonitorScreenState();
+}
+
+class _MonitorScreenState extends ConsumerState<MonitorScreen> {
+  DeviceMonitorController? _monitorController;
+
+  @override
+  void initState() {
+    super.initState();
+    _monitorController = ref.read(deviceMonitorControllerProvider.notifier);
+    Future.microtask(() {
+      if (mounted) {
+        _monitorController?.resumePolling();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _monitorController?.pausePolling();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(deviceMonitorControllerProvider);
     final controller = ref.read(deviceMonitorControllerProvider.notifier);
     final theme = Theme.of(context);

@@ -90,5 +90,9 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
     expect(tester.takeException(), isNull);
+
+    // Dispose widget tree to cleanly cancel any active timers
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
   });
 }

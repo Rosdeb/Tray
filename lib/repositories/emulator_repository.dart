@@ -80,9 +80,10 @@ class EmulatorRepository {
     );
   }
 
-  Future<HardwareAccelerationInfo> checkHardwareAcceleration(AndroidSdk? sdk) {
+  Future<HardwareAccelerationInfo> checkHardwareAcceleration(AndroidSdk? sdk, {bool forceRefresh = false}) {
     return systemEnvironmentService.checkHardwareAcceleration(
       emulatorPath: sdk?.emulatorPath,
+      forceRefresh: forceRefresh,
     );
   }
 

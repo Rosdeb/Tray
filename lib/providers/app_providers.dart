@@ -704,23 +704,37 @@ final deviceMonitorControllerProvider =
 class DeviceMonitorController extends Notifier<DeviceMonitorState> {
   Timer? _timer;
   bool _isPolling = false;
+  bool _isScreenActive = false;
 
   @override
   DeviceMonitorState build() {
     ref.onDispose(() => _timer?.cancel());
+    return const DeviceMonitorState(isLoading: true);
+  }
+
+  /// Called when the monitor screen is mounted to begin real-time telemetry polling.
+  void resumePolling() {
+    _isScreenActive = true;
     Future.microtask(() async {
       await refreshTargets();
       _restartTimer();
       await tick();
     });
-    return const DeviceMonitorState(isLoading: true);
+  }
+
+  /// Called when the user navigates away from the monitor screen to stop background CPU usage.
+  void pausePolling() {
+    _isScreenActive = false;
+    _timer?.cancel();
+    _timer = null;
   }
 
   void _restartTimer() {
     _timer?.cancel();
+    if (!_isScreenActive) return;
     final interval = state.config.refreshIntervalSeconds.clamp(1, 10);
     _timer = Timer.periodic(Duration(seconds: interval), (_) {
-      if (!state.isPaused) {
+      if (!state.isPaused && _isScreenActive) {
         tick();
       }
     });

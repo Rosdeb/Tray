@@ -29,7 +29,22 @@ class AdbDeviceInfo {
   bool get isAuthorized => state == 'device';
 }
 
+class _CachedDeviceProps {
+  const _CachedDeviceProps({
+    this.model,
+    this.manufacturer,
+    this.androidVersion,
+    this.apiLevel,
+  });
+
+  final String? model;
+  final String? manufacturer;
+  final String? androidVersion;
+  final int? apiLevel;
+}
+
 class AdbService {
+  final Map<String, _CachedDeviceProps> _devicePropsCache = <String, _CachedDeviceProps>{};
   Future<List<String>> devices(String adbPath) async {
     final result = await Process.run(adbPath, const <String>['devices'], runInShell: false)
         .timeout(const Duration(seconds: 8));
@@ -96,34 +111,49 @@ class AdbService {
         String? manufacturer;
 
         if (!isEmu && state == 'device') {
-          try {
-            final propRes = await Process.run(
-              adbPath,
-              <String>[
-                '-s',
-                serial,
-                'shell',
-                'getprop ro.product.model; getprop ro.product.manufacturer; getprop ro.build.version.release; getprop ro.build.version.sdk'
-              ],
-              runInShell: false,
-            ).timeout(const Duration(seconds: 3));
+          final cached = _devicePropsCache[serial];
+          if (cached != null) {
+            model = cached.model ?? model;
+            manufacturer = cached.manufacturer;
+            androidVersion = cached.androidVersion;
+            apiLevel = cached.apiLevel;
+          } else {
+            try {
+              final propRes = await Process.run(
+                adbPath,
+                <String>[
+                  '-s',
+                  serial,
+                  'shell',
+                  'getprop ro.product.model; getprop ro.product.manufacturer; getprop ro.build.version.release; getprop ro.build.version.sdk'
+                ],
+                runInShell: false,
+              ).timeout(const Duration(seconds: 3));
 
-            if (propRes.exitCode == 0) {
-              final propLines = propRes.stdout.toString().split(RegExp(r'\r?\n'));
-              if (propLines.isNotEmpty && propLines[0].trim().isNotEmpty) {
-                model = propLines[0].trim();
+              if (propRes.exitCode == 0) {
+                final propLines = propRes.stdout.toString().split(RegExp(r'\r?\n'));
+                if (propLines.isNotEmpty && propLines[0].trim().isNotEmpty) {
+                  model = propLines[0].trim();
+                }
+                if (propLines.length > 1 && propLines[1].trim().isNotEmpty) {
+                  manufacturer = propLines[1].trim();
+                }
+                if (propLines.length > 2 && propLines[2].trim().isNotEmpty) {
+                  androidVersion = propLines[2].trim();
+                }
+                if (propLines.length > 3 && propLines[3].trim().isNotEmpty) {
+                  apiLevel = int.tryParse(propLines[3].trim());
+                }
+
+                _devicePropsCache[serial] = _CachedDeviceProps(
+                  model: model,
+                  manufacturer: manufacturer,
+                  androidVersion: androidVersion,
+                  apiLevel: apiLevel,
+                );
               }
-              if (propLines.length > 1 && propLines[1].trim().isNotEmpty) {
-                manufacturer = propLines[1].trim();
-              }
-              if (propLines.length > 2 && propLines[2].trim().isNotEmpty) {
-                androidVersion = propLines[2].trim();
-              }
-              if (propLines.length > 3 && propLines[3].trim().isNotEmpty) {
-                apiLevel = int.tryParse(propLines[3].trim());
-              }
-            }
-          } catch (_) {}
+            } catch (_) {}
+          }
         }
 
         devList.add(AdbDeviceInfo(
@@ -139,6 +169,10 @@ class AdbService {
           connectionType: connectionType,
         ));
       }
+
+      // Evict disconnected devices from property cache
+      final activeSerials = devList.map((d) => d.serial).toSet();
+      _devicePropsCache.removeWhere((k, _) => !activeSerials.contains(k));
     } catch (_) {}
     return devList;
   }
