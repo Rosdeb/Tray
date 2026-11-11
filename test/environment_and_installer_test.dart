@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tray/core/utils/platform_paths.dart';
+import 'package:tray/models/bios_hardware_info.dart';
 import 'package:tray/models/dashboard_statistics.dart';
 import 'package:tray/models/emulator.dart';
 import 'package:tray/services/emulator_service.dart';
@@ -129,6 +130,34 @@ void main() {
       expect(args, contains('-wipe-data'));
       expect(args, contains('-writable-system'));
       expect(args, contains('-no-window'));
+    });
+  });
+
+  group('BiosAndHardwareInfo & SystemEnvironmentService', () {
+    final envService = SystemEnvironmentService();
+
+    test('BiosAndHardwareInfo formats summaries properly', () {
+      const info = BiosAndHardwareInfo(
+        motherboardManufacturer: 'ASUSTeK COMPUTER INC.',
+        motherboardProduct: 'ROG STRIX B550-F GAMING',
+        biosVendor: 'American Megatrends Inc.',
+        biosVersion: '3405',
+        biosReleaseDate: '02/24/2024',
+        cpuName: 'AMD Ryzen 7 5800X',
+        isVirtualizationFirmwareEnabled: true,
+        isHypervisorPresent: true,
+        recommendedBiosKey: 'F2 or Del',
+      );
+
+      expect(info.motherboardSummary, equals('ASUSTeK COMPUTER INC. ROG STRIX B550-F GAMING'));
+      expect(info.biosSummary, equals('3405 (02/24/2024)'));
+      expect(info.isVirtualizationActive, isTrue);
+    });
+
+    test('getBiosAndHardwareInfo executes safely without unhandled exceptions', () async {
+      final info = await envService.getBiosAndHardwareInfo();
+      expect(info, isNotNull);
+      expect(info.recommendedBiosKey, isNotEmpty);
     });
   });
 

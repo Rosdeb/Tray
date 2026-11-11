@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/android_sdk.dart';
 import '../models/app_settings.dart';
+import '../models/bios_hardware_info.dart';
 import '../models/dashboard_statistics.dart';
 import '../models/device_metrics.dart';
 import '../models/emulator.dart';
@@ -188,6 +189,11 @@ final scrcpyInfoProvider = FutureProvider<ScrcpyInfo>((ref) async {
 final scrcpyAvailableProvider = FutureProvider<bool>((ref) async {
   final info = await ref.watch(scrcpyInfoProvider.future);
   return info.isAvailable;
+});
+
+final biosAndHardwareInfoProvider = FutureProvider<BiosAndHardwareInfo>((ref) async {
+  final service = ref.watch(systemEnvironmentServiceProvider);
+  return service.getBiosAndHardwareInfo();
 });
 
 class EmulatorState {

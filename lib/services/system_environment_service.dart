@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import '../models/bios_hardware_info.dart';
 import '../models/hardware_acceleration.dart';
 
 class SystemEnvironmentService {
@@ -205,6 +207,146 @@ class SystemEnvironmentService {
         details: details,
         howToFix: 'Ensure virtualization is enabled.',
       );
+    }
+  }
+
+  /// Retrieves motherboard, BIOS firmware version, CPU, and virtualization flags.
+  Future<BiosAndHardwareInfo> getBiosAndHardwareInfo() async {
+    if (Platform.isWindows) {
+      try {
+        const psScript = r'''
+$bios = Get-CimInstance Win32_BIOS -ErrorAction SilentlyContinue;
+$board = Get-CimInstance Win32_BaseBoard -ErrorAction SilentlyContinue;
+$cpu = Get-CimInstance Win32_Processor -ErrorAction SilentlyContinue | Select-Object -First 1;
+$cs = Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue;
+$whpx = Get-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform -ErrorAction SilentlyContinue;
+
+@{
+  BiosVendor = if ($bios) { $bios.Manufacturer } else { "" };
+  BiosVersion = if ($bios) { $bios.SMBIOSBIOSVersion } else { "" };
+  BiosReleaseDate = if ($bios -and $bios.ReleaseDate) { $bios.ReleaseDate.ToString("yyyy-MM-dd") } else { "" };
+  BoardManufacturer = if ($board) { $board.Manufacturer } else { "" };
+  BoardProduct = if ($board) { $board.Product } else { "" };
+  CpuName = if ($cpu) { $cpu.Name } else { "" };
+  VirtEnabled = if ($cpu) { [bool]$cpu.VirtualizationFirmwareEnabled } else { $false };
+  HypervisorPresent = if ($cs) { [bool]$cs.HypervisorPresent } else { $false };
+  WhpxState = if ($whpx) { $whpx.State.ToString() } else { "Unknown" };
+} | ConvertTo-Json -Compress
+''';
+        final res = await Process.run(
+          'powershell',
+          ['-NoProfile', '-Command', psScript],
+          runInShell: false,
+        ).timeout(const Duration(seconds: 8));
+
+        if (res.exitCode == 0 && res.stdout.toString().trim().isNotEmpty) {
+          final data = jsonDecode(res.stdout.toString().trim()) as Map<String, dynamic>;
+          final mfr = data['BoardManufacturer']?.toString();
+          String key = 'F2 or Del';
+          final mfrLower = (mfr ?? '').toLowerCase();
+          if (mfrLower.contains('asus') || mfrLower.contains('asustek')) {
+            key = 'F2 or Del';
+          } else if (mfrLower.contains('msi')) {
+            key = 'Del';
+          } else if (mfrLower.contains('gigabyte')) {
+            key = 'Del or F12';
+          } else if (mfrLower.contains('lenovo')) {
+            key = 'F1, F2 or Enter';
+          } else if (mfrLower.contains('dell')) {
+            key = 'F2 or F12';
+          } else if (mfrLower.contains('hp') || mfrLower.contains('hewlett')) {
+            key = 'F10 or Esc';
+          } else if (mfrLower.contains('asrock')) {
+            key = 'F2 or Del';
+          }
+
+          return BiosAndHardwareInfo(
+            motherboardManufacturer: mfr,
+            motherboardProduct: data['BoardProduct']?.toString(),
+            biosVendor: data['BiosVendor']?.toString(),
+            biosVersion: data['BiosVersion']?.toString(),
+            biosReleaseDate: data['BiosReleaseDate']?.toString(),
+            cpuName: data['CpuName']?.toString(),
+            isVirtualizationFirmwareEnabled: data['VirtEnabled'] == true,
+            isHypervisorPresent: data['HypervisorPresent'] == true,
+            whpxFeatureStatus: data['WhpxState']?.toString(),
+            recommendedBiosKey: key,
+          );
+        }
+      } catch (_) {}
+    } else if (Platform.isMacOS) {
+      try {
+        final cpuRes = await Process.run('sysctl', ['-n', 'machdep.cpu.brand_string']);
+        final cpuName = cpuRes.exitCode == 0 ? cpuRes.stdout.toString().trim() : 'Apple Silicon / Intel Mac';
+        return BiosAndHardwareInfo(
+          motherboardManufacturer: 'Apple Inc.',
+          motherboardProduct: 'Mac Platform',
+          biosVendor: 'Apple Firmware (EFI / iBoot)',
+          biosVersion: 'macOS Built-in',
+          cpuName: cpuName,
+          isVirtualizationFirmwareEnabled: true,
+          isHypervisorPresent: true,
+          whpxFeatureStatus: 'Hypervisor.framework Active',
+          recommendedBiosKey: 'Hold Power button for Startup Options',
+        );
+      } catch (_) {}
+    }
+
+    return const BiosAndHardwareInfo();
+  }
+
+  /// Triggers a Windows system restart directly into the UEFI/BIOS setup screen.
+  Future<bool> rebootToBios() async {
+    if (!Platform.isWindows) return false;
+    try {
+      final res = await Process.run('shutdown.exe', ['/r', '/fw', '/t', '2']);
+      return res.exitCode == 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Launches PowerShell with administrator elevation to enable Windows Hypervisor Platform (WHPX).
+  Future<bool> enableWindowsHypervisorPlatform() async {
+    if (!Platform.isWindows) return false;
+    try {
+      final res = await Process.run('powershell', [
+        '-NoProfile',
+        '-Command',
+        'Start-Process powershell -Verb RunAs -ArgumentList "-NoProfile -Command Enable-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform -All -NoRestart"',
+      ]);
+      return res.exitCode == 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Opens the official vendor's support/BIOS page.
+  static Future<void> openMotherboardBiosSupportPage(String? vendor) async {
+    final v = (vendor ?? '').toLowerCase();
+    String url = 'https://www.google.com/search?q=motherboard+bios+update';
+    if (v.contains('asus') || v.contains('asustek')) {
+      url = 'https://www.asus.com/support/';
+    } else if (v.contains('msi')) {
+      url = 'https://www.msi.com/support';
+    } else if (v.contains('gigabyte')) {
+      url = 'https://www.gigabyte.com/Support';
+    } else if (v.contains('dell')) {
+      url = 'https://www.dell.com/support/home';
+    } else if (v.contains('hp') || v.contains('hewlett')) {
+      url = 'https://support.hp.com';
+    } else if (v.contains('lenovo')) {
+      url = 'https://pcsupport.lenovo.com';
+    } else if (v.contains('asrock')) {
+      url = 'https://www.asrock.com/support/';
+    }
+
+    if (Platform.isWindows) {
+      await Process.start('explorer.exe', [url]);
+    } else if (Platform.isMacOS) {
+      await Process.start('open', [url]);
+    } else {
+      await Process.start('xdg-open', [url]);
     }
   }
 
