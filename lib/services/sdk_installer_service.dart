@@ -668,6 +668,10 @@ ANDROID SOFTWARE DEVELOPMENT KIT TERMS AND CONDITIONS
     required String systemImage,
     String device = 'pixel_7',
     int ramMb = 4096,
+    int cpuCores = 4,
+    int internalStorageMb = 8192,
+    String gpuMode = 'auto',
+    bool hardwareKeyboard = true,
   }) async {
     final env = Map<String, String>.from(Platform.environment);
     env['JAVA_HOME'] = javaHome;
@@ -730,9 +734,11 @@ ANDROID SOFTWARE DEVELOPMENT KIT TERMS AND CONDITIONS
           }
         }
         map['hw.ramSize'] = ramMb.toString();
-        map['hw.keyboard'] = 'yes';
+        map['hw.cpu.ncore'] = cpuCores.toString();
+        map['disk.dataPartition.size'] = '${internalStorageMb}M';
+        map['hw.keyboard'] = hardwareKeyboard ? 'yes' : 'no';
         map['hw.gpu.enabled'] = 'yes';
-        map['hw.gpu.mode'] = 'auto';
+        map['hw.gpu.mode'] = gpuMode;
 
         final buffer = StringBuffer();
         for (final entry in map.entries) {

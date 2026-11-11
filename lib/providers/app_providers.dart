@@ -404,6 +404,10 @@ class EmulatorController extends AsyncNotifier<EmulatorState> {
     required String systemImage,
     String device = 'pixel_7',
     int ramMb = 4096,
+    int cpuCores = 4,
+    int internalStorageMb = 8192,
+    String gpuMode = 'auto',
+    bool hardwareKeyboard = true,
     void Function(String progress)? onProgress,
   }) async {
     final sdk = state.value?.sdk;
@@ -417,6 +421,10 @@ class EmulatorController extends AsyncNotifier<EmulatorState> {
       systemImage: systemImage,
       device: device,
       ramMb: ramMb,
+      cpuCores: cpuCores,
+      internalStorageMb: internalStorageMb,
+      gpuMode: gpuMode,
+      hardwareKeyboard: hardwareKeyboard,
       onProgress: onProgress,
     );
 

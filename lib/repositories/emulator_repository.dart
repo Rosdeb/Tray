@@ -101,6 +101,10 @@ class EmulatorRepository {
     required String systemImage,
     String device = 'pixel_7',
     int ramMb = 4096,
+    int cpuCores = 4,
+    int internalStorageMb = 8192,
+    String gpuMode = 'auto',
+    bool hardwareKeyboard = true,
     void Function(String progress)? onProgress,
   }) async {
     final avdManager = sdk.avdManagerPath;
@@ -137,6 +141,10 @@ class EmulatorRepository {
       systemImage: systemImage,
       device: device,
       ramMb: ramMb,
+      cpuCores: cpuCores,
+      internalStorageMb: internalStorageMb,
+      gpuMode: gpuMode,
+      hardwareKeyboard: hardwareKeyboard,
     );
   }
 }
