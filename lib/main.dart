@@ -16,7 +16,7 @@ Future<void> main() async {
   if (Platform.isWindows || Platform.isMacOS) {
     await windowManager.ensureInitialized();
     // Slightly larger dimensions on macOS for comfortable system font rendering and traffic lights
-    final windowSize = Platform.isMacOS ? const Size(1020, 565) : const Size(988, 545);
+    final windowSize = Platform.isMacOS ? const Size(1200, 565) : const Size(1100, 545);
     final windowOptions = WindowOptions(
       size: windowSize,
       minimumSize: windowSize,
