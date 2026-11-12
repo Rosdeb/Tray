@@ -27,6 +27,8 @@ Future<void> main() async {
       titleBarStyle: TitleBarStyle.hidden,
     );
     await windowManager.waitUntilReadyToShow(windowOptions, () async {
+      await windowManager.setSize(windowSize);
+      await windowManager.center();
       await windowManager.setResizable(false);
       await windowManager.setMaximizable(false);
       await windowManager.setHasShadow(true);
