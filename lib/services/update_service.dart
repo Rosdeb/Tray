@@ -225,94 +225,81 @@ class UpdateService {
         throw StateError('Cannot run Windows .exe installer on macOS. Please ensure a macOS .dmg release is selected.');
       }
 
-      bool updatedInPlace = false;
+      String targetAppPath = '/Applications/Tray.app';
       try {
-        if (installerPath.toLowerCase().endsWith('.dmg')) {
-          final mountDir = Directory('/tmp/tray_dmg_mount_${DateTime.now().millisecondsSinceEpoch}');
-          if (mountDir.existsSync()) {
-            await Process.run('hdiutil', ['detach', mountDir.path, '-force']);
-          }
-          await mountDir.create(recursive: true);
-
-          final attachRes = await Process.run('hdiutil', [
-            'attach',
-            installerPath,
-            '-nobrowse',
-            '-mountpoint',
-            mountDir.path,
-          ]);
-
-          if (attachRes.exitCode == 0) {
-            final entries = mountDir.listSync();
-            final appEntity = entries.firstWhere(
-              (e) => e.path.endsWith('.app'),
-              orElse: () => File(''),
-            );
-
-            if (appEntity.existsSync()) {
-              String targetAppPath = '/Applications/Tray.app';
-              try {
-                final resolvedExecutable = Platform.resolvedExecutable;
-                final appIdx = resolvedExecutable.indexOf('.app');
-                if (appIdx != -1) {
-                  targetAppPath = resolvedExecutable.substring(0, appIdx + 4);
-                }
-              } catch (_) {}
-
-              final targetParent = Directory(targetAppPath).parent.path;
-              await Process.run('rm', ['-rf', targetAppPath]);
-              final cpRes = await Process.run('cp', ['-R', appEntity.path, targetParent]);
-              await Process.run('hdiutil', ['detach', mountDir.path, '-force']);
-
-              if (cpRes.exitCode == 0) {
-                updatedInPlace = true;
-                await Process.start('open', ['-n', targetAppPath], mode: ProcessStartMode.detached);
-              }
-            }
-          }
-        } else if (installerPath.toLowerCase().endsWith('.zip')) {
-          final extractDir = Directory('/tmp/tray_zip_${DateTime.now().millisecondsSinceEpoch}');
-          await extractDir.create(recursive: true);
-          final unzipRes = await Process.run('unzip', ['-q', '-o', installerPath, '-d', extractDir.path]);
-          if (unzipRes.exitCode == 0) {
-            final entries = extractDir.listSync();
-            final appEntity = entries.firstWhere(
-              (e) => e.path.endsWith('.app'),
-              orElse: () => File(''),
-            );
-            if (appEntity.existsSync()) {
-              String targetAppPath = '/Applications/Tray.app';
-              try {
-                final resolvedExecutable = Platform.resolvedExecutable;
-                final appIdx = resolvedExecutable.indexOf('.app');
-                if (appIdx != -1) {
-                  targetAppPath = resolvedExecutable.substring(0, appIdx + 4);
-                }
-              } catch (_) {}
-
-              final targetParent = Directory(targetAppPath).parent.path;
-              await Process.run('rm', ['-rf', targetAppPath]);
-              final cpRes = await Process.run('cp', ['-R', appEntity.path, targetParent]);
-              if (cpRes.exitCode == 0) {
-                updatedInPlace = true;
-                await Process.start('open', ['-n', targetAppPath], mode: ProcessStartMode.detached);
-              }
-            }
-          }
+        final resolvedExecutable = Platform.resolvedExecutable;
+        final appIdx = resolvedExecutable.indexOf('.app');
+        if (appIdx != -1) {
+          targetAppPath = resolvedExecutable.substring(0, appIdx + 4);
         }
       } catch (_) {}
 
-      if (!updatedInPlace) {
-        // Fallback: mount and reveal the DMG Finder window
-        await Process.start(
-          'open',
-          [installerPath],
-          mode: ProcessStartMode.detached,
-        );
-      }
+      // Write a detached helper script that executes right after this process exits.
+      // This avoids Unix 'Text file busy' locks while copying over the active binary.
+      final scriptFile = File('/tmp/tray_apply_update.sh');
+      final scriptContent = '''#!/bin/bash
+sleep 1
+TARGET_APP="$targetAppPath"
+PKG_PATH="$installerPath"
+
+if [[ "\$PKG_PATH" == *.dmg ]]; then
+  MOUNT_DIR=\$(mktemp -d /tmp/tray_dmg_XXXXXX)
+  hdiutil attach "\$PKG_PATH" -nobrowse -mountpoint "\$MOUNT_DIR" -quiet
+
+  APP_SOURCE=\$(find "\$MOUNT_DIR" -maxdepth 1 -name "*.app" | head -n 1)
+  SUCCESS=0
+
+  if [ -n "\$APP_SOURCE" ] && [ -d "\$APP_SOURCE" ]; then
+    rm -rf "\$TARGET_APP" 2>/dev/null && cp -R "\$APP_SOURCE" "\$TARGET_APP" 2>/dev/null
+    if [ \$? -eq 0 ]; then
+      SUCCESS=1
+    fi
+  fi
+
+  hdiutil detach "\$MOUNT_DIR" -force -quiet 2>/dev/null || true
+  rm -rf "\$MOUNT_DIR" 2>/dev/null || true
+
+  if [ \$SUCCESS -eq 1 ]; then
+    open -n "\$TARGET_APP"
+  else
+    open "\$PKG_PATH"
+  fi
+elif [[ "\$PKG_PATH" == *.zip ]]; then
+  EXTRACT_DIR=\$(mktemp -d /tmp/tray_zip_XXXXXX)
+  unzip -q -o "\$PKG_PATH" -d "\$EXTRACT_DIR" 2>/dev/null
+  APP_SOURCE=\$(find "\$EXTRACT_DIR" -maxdepth 1 -name "*.app" | head -n 1)
+  SUCCESS=0
+
+  if [ -n "\$APP_SOURCE" ] && [ -d "\$APP_SOURCE" ]; then
+    rm -rf "\$TARGET_APP" 2>/dev/null && cp -R "\$APP_SOURCE" "\$TARGET_APP" 2>/dev/null
+    if [ \$? -eq 0 ]; then
+      SUCCESS=1
+    fi
+  fi
+
+  rm -rf "\$EXTRACT_DIR" 2>/dev/null || true
+
+  if [ \$SUCCESS -eq 1 ]; then
+    open -n "\$TARGET_APP"
+  else
+    open -R "\$PKG_PATH"
+  fi
+else
+  open "\$PKG_PATH"
+fi
+''';
+
+      await scriptFile.writeAsString(scriptContent);
+      await Process.run('chmod', ['+x', scriptFile.path]);
+
+      await Process.start(
+        '/bin/bash',
+        [scriptFile.path],
+        mode: ProcessStartMode.detached,
+      );
     }
 
-    await Future.delayed(const Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 400));
     exit(0);
   }
 }

@@ -472,6 +472,7 @@ class _UpdateSettingsSectionState extends ConsumerState<_UpdateSettingsSection> 
   bool _checking = false;
   bool _downloading = false;
   double _progress = 0;
+  String _statusMessage = "";
   UpdateCheckResult? _lastResult;
 
   @override
@@ -515,13 +516,32 @@ class _UpdateSettingsSectionState extends ConsumerState<_UpdateSettingsSection> 
     setState(() {
       _downloading = true;
       _progress = 0;
+      _statusMessage = 'Starting download...';
     });
     try {
       final service = ref.read(updateServiceProvider);
       final path = await service.downloadInstaller(
         update.downloadUrl,
-        onProgress: (p) => setState(() => _progress = p),
+        onProgress: (p) {
+          if (mounted) {
+            setState(() {
+              _progress = p;
+              _statusMessage = p >= 1.0
+                  ? (Platform.isMacOS
+                      ? 'Download complete. Launching macOS installer...'
+                      : 'Download complete. Launching installer...')
+                  : 'Downloading update: ${(p * 100).toStringAsFixed(0)}%';
+            });
+          }
+        },
       );
+      if (mounted) {
+        setState(() {
+          _statusMessage = Platform.isMacOS
+              ? 'Applying update and restarting...'
+              : 'Launching installer...';
+        });
+      }
       await service.runInstallerAndExit(path);
     } catch (e) {
       if (mounted) {
@@ -587,11 +607,13 @@ class _UpdateSettingsSectionState extends ConsumerState<_UpdateSettingsSection> 
           const SizedBox(height: 16),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(value: _progress),
+            child: LinearProgressIndicator(value: _progress > 0 ? _progress : null),
           ),
           const SizedBox(height: 6),
           Text(
-            'Downloading update: ${(_progress * 100).toStringAsFixed(0)}%',
+            _statusMessage.isNotEmpty
+                ? _statusMessage
+                : 'Downloading update: ${(_progress * 100).toStringAsFixed(0)}%',
             style: theme.textTheme.bodySmall,
           ),
         ] else if (hasUpdate && updateInfo != null) ...[
