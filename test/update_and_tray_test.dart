@@ -22,6 +22,31 @@ void main() {
       expect(UpdateService.isNewerVersion('1.3.0', '1.2.99'), isTrue);
       expect(UpdateService.isNewerVersion('1.2.17', '1.2.18'), isFalse);
     });
+
+    test('selectPlatformAsset strictly matches the current platform and ignores checksums', () {
+      final mixedAssets = [
+        {"name": "Tray-Setup.exe.sha256", "browser_download_url": "https://example.com/sha"},
+        {"name": "Tray-Setup.exe", "browser_download_url": "https://example.com/exe"},
+        {"name": "Tray.dmg.sha256", "browser_download_url": "https://example.com/dmg_sha"},
+        {"name": "Tray.dmg", "browser_download_url": "https://example.com/dmg"},
+      ];
+
+      // Windows selection
+      final winAsset = UpdateService.selectPlatformAsset(mixedAssets, isWindows: true, isMacOS: false);
+      expect(winAsset["name"], "Tray-Setup.exe");
+
+      // macOS selection
+      final macAsset = UpdateService.selectPlatformAsset(mixedAssets, isWindows: false, isMacOS: true);
+      expect(macAsset["name"], "Tray.dmg");
+
+      // If release only has Windows exe, macOS selection MUST return null and NEVER fall back to .exe
+      final windowsOnlyAssets = [
+        {"name": "Tray-Setup.exe", "browser_download_url": "https://example.com/exe"},
+        {"name": "Tray-Setup.exe.sha256", "browser_download_url": "https://example.com/sha"},
+      ];
+      final macNull = UpdateService.selectPlatformAsset(windowsOnlyAssets, isWindows: false, isMacOS: true);
+      expect(macNull, isNull);
+    });
   });
 
   group('AppTrayService', () {

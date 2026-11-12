@@ -67,6 +67,27 @@ class UpdateService {
     return false;
   }
 
+  /// Strictly picks the installer asset matching the active OS platform.
+  /// Never returns Windows .exe on macOS, and never returns macOS .dmg on Windows.
+  static dynamic selectPlatformAsset(List<dynamic> assets, {bool? isWindows, bool? isMacOS}) {
+    final win = isWindows ?? Platform.isWindows;
+    final mac = isMacOS ?? Platform.isMacOS;
+
+    for (final a in assets) {
+      if (a is! Map) continue;
+      final name = (a["name"] as String? ?? "").toLowerCase();
+      if (name.endsWith('.sha256')) continue;
+
+      if (win && name.endsWith('.exe')) {
+        return a;
+      }
+      if (mac && (name.endsWith('.dmg') || name.endsWith('.zip')) && !name.endsWith('.exe')) {
+        return a;
+      }
+    }
+    return null;
+  }
+
   /// Comprehensive check returning full details and error states.
   Future<UpdateCheckResult> checkUpdateWithDetails() async {
     try {
@@ -101,39 +122,14 @@ class UpdateService {
       }
 
       final assets = data["assets"] as List<dynamic>? ?? [];
-      dynamic chosenAsset;
-
-      if (Platform.isWindows) {
-        chosenAsset = assets.firstWhere(
-          (a) {
-            final name = (a["name"] as String? ?? "").toLowerCase();
-            return name.endsWith('.exe') || name.contains('setup');
-          },
-          orElse: () => null,
-        );
-      } else if (Platform.isMacOS) {
-        chosenAsset = assets.firstWhere(
-          (a) {
-            final name = (a["name"] as String? ?? "").toLowerCase();
-            return name.endsWith('.dmg') || name.endsWith('.zip');
-          },
-          orElse: () => null,
-        );
-      }
-
-      chosenAsset ??= assets.firstWhere(
-        (a) {
-          final name = (a["name"] as String? ?? "").toLowerCase();
-          return name.endsWith('.exe') || name.endsWith('.dmg') || name.endsWith('.zip');
-        },
-        orElse: () => assets.isNotEmpty ? assets.first : null,
-      );
+      final chosenAsset = selectPlatformAsset(assets);
 
       if (chosenAsset == null) {
+        final platformName = Platform.isMacOS ? "macOS (.dmg)" : (Platform.isWindows ? "Windows (.exe)" : "compatible");
         return UpdateCheckResult(
           isUpToDate: false,
           currentVersion: currentVersion,
-          error: "No compatible installer asset found in release $rawTag",
+          error: "A newer release ($rawTag) is available, but the $platformName installer is still building on GitHub Actions. Please check again in a few moments.",
         );
       }
 
@@ -168,7 +164,12 @@ class UpdateService {
     void Function(double progress)? onProgress,
   }) async {
     final tempDir = await getTemporaryDirectory();
-    final ext = Platform.isWindows ? '.exe' : (Platform.isMacOS ? '.dmg' : '.zip');
+    final uri = Uri.parse(url);
+    final rawName = p.basename(uri.path).toLowerCase();
+    String ext = p.extension(rawName);
+    if (ext.isEmpty || ext == '.sha256') {
+      ext = Platform.isWindows ? '.exe' : '.dmg';
+    }
     final filePath = p.join(tempDir.path, 'Tray-Update$ext');
 
     final file = File(filePath);
@@ -211,44 +212,91 @@ class UpdateService {
   /// Detaches and runs the installer, then closes the current application.
   Future<void> runInstallerAndExit(String installerPath) async {
     if (Platform.isWindows) {
+      if (!installerPath.toLowerCase().endsWith('.exe')) {
+        throw StateError('Downloaded update file is not a Windows executable: $installerPath');
+      }
       await Process.start(
         installerPath,
         ['/CLOSEAPPLICATIONS'],
         mode: ProcessStartMode.detached,
       );
     } else if (Platform.isMacOS) {
+      if (installerPath.toLowerCase().endsWith('.exe')) {
+        throw StateError('Cannot run Windows .exe installer on macOS. Please ensure a macOS .dmg release is selected.');
+      }
+
       bool updatedInPlace = false;
       try {
-        final mountDir = Directory('/tmp/tray_dmg_mount');
-        if (mountDir.existsSync()) {
-          await Process.run('hdiutil', ['detach', mountDir.path, '-force']);
-        }
-        await mountDir.create(recursive: true);
-
-        final attachRes = await Process.run('hdiutil', [
-          'attach',
-          installerPath,
-          '-nobrowse',
-          '-mountpoint',
-          mountDir.path,
-        ]);
-
-        if (attachRes.exitCode == 0) {
-          final entries = mountDir.listSync();
-          final appEntity = entries.firstWhere(
-            (e) => e.path.endsWith('.app'),
-            orElse: () => File(''),
-          );
-
-          if (appEntity.existsSync()) {
-            const targetAppPath = '/Applications/Tray.app';
-            await Process.run('rm', ['-rf', targetAppPath]);
-            final cpRes = await Process.run('cp', ['-R', appEntity.path, '/Applications/']);
+        if (installerPath.toLowerCase().endsWith('.dmg')) {
+          final mountDir = Directory('/tmp/tray_dmg_mount_${DateTime.now().millisecondsSinceEpoch}');
+          if (mountDir.existsSync()) {
             await Process.run('hdiutil', ['detach', mountDir.path, '-force']);
+          }
+          await mountDir.create(recursive: true);
 
-            if (cpRes.exitCode == 0) {
-              updatedInPlace = true;
-              await Process.start('open', ['-n', targetAppPath], mode: ProcessStartMode.detached);
+          final attachRes = await Process.run('hdiutil', [
+            'attach',
+            installerPath,
+            '-nobrowse',
+            '-mountpoint',
+            mountDir.path,
+          ]);
+
+          if (attachRes.exitCode == 0) {
+            final entries = mountDir.listSync();
+            final appEntity = entries.firstWhere(
+              (e) => e.path.endsWith('.app'),
+              orElse: () => File(''),
+            );
+
+            if (appEntity.existsSync()) {
+              String targetAppPath = '/Applications/Tray.app';
+              try {
+                final resolvedExecutable = Platform.resolvedExecutable;
+                final appIdx = resolvedExecutable.indexOf('.app');
+                if (appIdx != -1) {
+                  targetAppPath = resolvedExecutable.substring(0, appIdx + 4);
+                }
+              } catch (_) {}
+
+              final targetParent = Directory(targetAppPath).parent.path;
+              await Process.run('rm', ['-rf', targetAppPath]);
+              final cpRes = await Process.run('cp', ['-R', appEntity.path, targetParent]);
+              await Process.run('hdiutil', ['detach', mountDir.path, '-force']);
+
+              if (cpRes.exitCode == 0) {
+                updatedInPlace = true;
+                await Process.start('open', ['-n', targetAppPath], mode: ProcessStartMode.detached);
+              }
+            }
+          }
+        } else if (installerPath.toLowerCase().endsWith('.zip')) {
+          final extractDir = Directory('/tmp/tray_zip_${DateTime.now().millisecondsSinceEpoch}');
+          await extractDir.create(recursive: true);
+          final unzipRes = await Process.run('unzip', ['-q', '-o', installerPath, '-d', extractDir.path]);
+          if (unzipRes.exitCode == 0) {
+            final entries = extractDir.listSync();
+            final appEntity = entries.firstWhere(
+              (e) => e.path.endsWith('.app'),
+              orElse: () => File(''),
+            );
+            if (appEntity.existsSync()) {
+              String targetAppPath = '/Applications/Tray.app';
+              try {
+                final resolvedExecutable = Platform.resolvedExecutable;
+                final appIdx = resolvedExecutable.indexOf('.app');
+                if (appIdx != -1) {
+                  targetAppPath = resolvedExecutable.substring(0, appIdx + 4);
+                }
+              } catch (_) {}
+
+              final targetParent = Directory(targetAppPath).parent.path;
+              await Process.run('rm', ['-rf', targetAppPath]);
+              final cpRes = await Process.run('cp', ['-R', appEntity.path, targetParent]);
+              if (cpRes.exitCode == 0) {
+                updatedInPlace = true;
+                await Process.start('open', ['-n', targetAppPath], mode: ProcessStartMode.detached);
+              }
             }
           }
         }
