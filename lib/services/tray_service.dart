@@ -17,6 +17,9 @@ class AppTrayService with TrayListener, WindowListener {
   Future<void> Function(String name)? _onMirrorEmulator;
   Future<void> Function(String serial)? _onMirrorPhysical;
   Future<void> Function(String target)? _onViewDeviceLogs;
+  Future<void> Function(String serial)? _onSwitchToWifi;
+  Future<void> Function(String serial)? _onDisconnectWifi;
+  Future<void> Function()? _onOpenWirelessDialog;
 
   List<Emulator> _lastEmulators = const [];
   Set<String> _lastBooting = const {};
@@ -32,6 +35,9 @@ class AppTrayService with TrayListener, WindowListener {
     Future<void> Function(String name)? onMirrorEmulator,
     Future<void> Function(String serial)? onMirrorPhysical,
     Future<void> Function(String target)? onViewDeviceLogs,
+    Future<void> Function(String serial)? onSwitchToWifi,
+    Future<void> Function(String serial)? onDisconnectWifi,
+    Future<void> Function()? onOpenWirelessDialog,
   }) async {
     if (!Platform.isWindows && !Platform.isMacOS) return;
 
@@ -44,6 +50,9 @@ class AppTrayService with TrayListener, WindowListener {
     _onMirrorEmulator = onMirrorEmulator;
     _onMirrorPhysical = onMirrorPhysical;
     _onViewDeviceLogs = onViewDeviceLogs;
+    _onSwitchToWifi = onSwitchToWifi;
+    _onDisconnectWifi = onDisconnectWifi;
+    _onOpenWirelessDialog = onOpenWirelessDialog;
 
     windowManager.addListener(this);
     trayManager.addListener(this);
@@ -111,6 +120,16 @@ class AppTrayService with TrayListener, WindowListener {
                     key: 'mirror_phys:${device.serial ?? device.name}',
                     label: 'Mirror Screen (scrcpy)',
                   ),
+                  if (device.connectionType != 'Wi-Fi')
+                    MenuItem(
+                      key: 'wifi_switch:${device.serial ?? device.name}',
+                      label: 'Switch to Wi-Fi Mode',
+                    )
+                  else
+                    MenuItem(
+                      key: 'wifi_disc:${device.serial ?? device.name}',
+                      label: 'Disconnect Wi-Fi',
+                    ),
                   MenuItem(
                     key: 'logs_device:${device.serial ?? device.name}',
                     label: 'View Device Logs (logcat)',
@@ -201,6 +220,7 @@ class AppTrayService with TrayListener, WindowListener {
       }
 
       items.addAll([
+        MenuItem(key: 'wireless_dialog', label: 'Connect Wireless Device...'),
         MenuItem(key: 'open', label: 'Open Manager'),
         MenuItem(key: 'refresh', label: 'Refresh Devices'),
         MenuItem(key: 'check_update', label: 'Check for Updates...'),
@@ -240,6 +260,9 @@ class AppTrayService with TrayListener, WindowListener {
     if (key == null) return;
 
     switch (key) {
+      case 'wireless_dialog':
+        await _onOpenWirelessDialog?.call();
+        break;
       case 'open':
         await _onOpenManager?.call();
         break;
@@ -271,6 +294,12 @@ class AppTrayService with TrayListener, WindowListener {
         } else if (key.startsWith('logs_device:')) {
           final target = key.substring('logs_device:'.length);
           await _onViewDeviceLogs?.call(target);
+        } else if (key.startsWith('wifi_switch:')) {
+          final serial = key.substring('wifi_switch:'.length);
+          await _onSwitchToWifi?.call(serial);
+        } else if (key.startsWith('wifi_disc:')) {
+          final serial = key.substring('wifi_disc:'.length);
+          await _onDisconnectWifi?.call(serial);
         }
         break;
     }

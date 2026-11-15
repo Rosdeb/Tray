@@ -10,6 +10,7 @@ import '../models/emulator.dart';
 import '../providers/app_providers.dart';
 import '../services/tray_service.dart';
 import '../services/update_service.dart';
+import '../widgets/wireless_connect_dialog.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'logs/logs_screen.dart';
 import 'monitor/monitor_screen.dart';
@@ -97,6 +98,37 @@ class _HomeShellState extends ConsumerState<HomeShell>
           orElse: () => Emulator(name: serial, serial: serial, isPhysical: true, status: EmulatorStatus.running),
         );
         await ref.read(emulatorControllerProvider.notifier).mirrorWithScrcpy(target);
+      },
+      onSwitchToWifi: (serial) async {
+        final emus = ref.read(emulatorControllerProvider).value?.emulators ?? [];
+        final target = emus.firstWhere(
+          (e) => e.serial == serial || e.name == serial,
+          orElse: () => Emulator(name: serial, serial: serial, isPhysical: true, status: EmulatorStatus.running),
+        );
+        await ref.read(emulatorControllerProvider.notifier).switchDeviceToWifi(target);
+      },
+      onDisconnectWifi: (serial) async {
+        final emus = ref.read(emulatorControllerProvider).value?.emulators ?? [];
+        final target = emus.firstWhere(
+          (e) => e.serial == serial || e.name == serial,
+          orElse: () => Emulator(name: serial, serial: serial, isPhysical: true, status: EmulatorStatus.running),
+        );
+        await ref.read(emulatorControllerProvider.notifier).disconnectWireless(target);
+      },
+      onOpenWirelessDialog: () async {
+        final isMinimized = await windowManager.isMinimized();
+        if (isMinimized) {
+          await windowManager.restore();
+        }
+        await windowManager.show();
+        await windowManager.focus();
+        if (mounted) {
+          showDialog<void>(
+            context: context,
+            barrierDismissible: true,
+            builder: (_) => const WirelessConnectDialog(),
+          );
+        }
       },
     );
 

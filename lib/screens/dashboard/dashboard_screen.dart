@@ -12,6 +12,7 @@ import '../../widgets/hardware_accel_banner.dart';
 import '../../widgets/scrcpy_install_dialog.dart';
 import '../../widgets/sdk_setup_dialog.dart';
 import '../../widgets/stat_tile.dart';
+import '../../widgets/wireless_connect_dialog.dart';
 
 enum EmulatorFilter { all, running, physical, offline, favorites }
 
@@ -78,6 +79,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     onRefresh: () => ref.read(emulatorControllerProvider.notifier).refresh(),
                     onCreateAvd: () => CreateAvdDialog.show(context),
                     onSetupSdk: () => SdkSetupDialog.show(context),
+                    onConnectWireless: () => showDialog<void>(
+                      context: context,
+                      builder: (_) => const WirelessConnectDialog(),
+                    ),
                   ),
                 ),
               ),
@@ -184,6 +189,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           ref.read(deviceLogsControllerProvider.notifier).selectTarget(
                             emulator.serial ?? emulator.name,
                           );
+                        },
+                        onSwitchToWifi: () async {
+                          final res = await ref.read(emulatorControllerProvider.notifier).switchDeviceToWifi(emulator);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(res.message ?? (res.success ? 'Connected wirelessly!' : 'Failed to switch to Wi-Fi')),
+                                backgroundColor: res.success ? Colors.teal : Colors.red,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        },
+                        onDisconnectWifi: () async {
+                          final res = await ref.read(emulatorControllerProvider.notifier).disconnectWireless(emulator);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(res ? 'Wireless device disconnected' : 'Failed to disconnect'),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
                         },
                       );
                     },
@@ -336,6 +364,7 @@ class _Header extends StatelessWidget {
     required this.onRefresh,
     required this.onCreateAvd,
     required this.onSetupSdk,
+    required this.onConnectWireless,
   });
 
   final String? sdkPath;
@@ -343,6 +372,7 @@ class _Header extends StatelessWidget {
   final VoidCallback onRefresh;
   final VoidCallback onCreateAvd;
   final VoidCallback onSetupSdk;
+  final VoidCallback onConnectWireless;
 
   @override
   Widget build(BuildContext context) {
@@ -384,6 +414,17 @@ class _Header extends StatelessWidget {
             label: const Text('Create Device'),
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+          ),
+          const SizedBox(width: 10),
+          OutlinedButton.icon(
+            onPressed: onConnectWireless,
+            icon: const Icon(CupertinoIcons.wifi, size: 18),
+            label: const Text('Connect Wi-Fi'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.teal,
+              side: BorderSide(color: Colors.teal.withValues(alpha: 0.5)),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             ),
           ),
           const SizedBox(width: 10),

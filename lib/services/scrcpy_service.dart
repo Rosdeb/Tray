@@ -151,6 +151,35 @@ class ScrcpyService {
       env['ADB'] = adbPath;
     }
 
+    if (Platform.isWindows) {
+      final scrcpyDir = p.dirname(scrcpyPath);
+      // 1. Check for official scrcpy-noconsole.vbs bundled with scrcpy releases
+      final officialVbs = File(p.join(scrcpyDir, 'scrcpy-noconsole.vbs'));
+      if (officialVbs.existsSync()) {
+        try {
+          final wscriptExe = File(r'C:\Windows\System32\wscript.exe').existsSync()
+              ? r'C:\Windows\System32\wscript.exe'
+              : 'wscript.exe';
+          return await Process.start(
+            wscriptExe,
+            <String>[officialVbs.path, ...args],
+            workingDirectory: scrcpyDir,
+            environment: env,
+          );
+        } catch (_) {}
+      }
+
+      // 2. Dedicated silent launcher on Windows (hides terminal window via SW_HIDE)
+      try {
+        return await _launchHiddenWindows(
+          scrcpyPath,
+          args,
+          workingDirectory: scrcpyDir,
+          environment: env,
+        );
+      } catch (_) {}
+    }
+
     return Process.start(
       scrcpyPath,
       args,
@@ -158,5 +187,42 @@ class ScrcpyService {
       environment: env,
       mode: ProcessStartMode.detached,
     );
+  }
+
+  Future<Process?> _launchHiddenWindows(
+    String executable,
+    List<String> arguments, {
+    String? workingDirectory,
+    Map<String, String>? environment,
+  }) async {
+    final tempDir = Directory.systemTemp.createTempSync('scrcpy_launch_');
+    final vbsFile = File(p.join(tempDir.path, 'run_hidden_scrcpy.vbs'));
+
+    final argsString = arguments.map((arg) => '"${arg.replaceAll('"', '""')}"').join(' ');
+    final command = '"$executable" $argsString';
+    final escapedCommand = command.replaceAll('"', '""');
+
+    final vbsContent = 'CreateObject("Wscript.Shell").Run "$escapedCommand", 0, False';
+    vbsFile.writeAsStringSync(vbsContent);
+
+    final wscriptExe = File(r'C:\Windows\System32\wscript.exe').existsSync()
+        ? r'C:\Windows\System32\wscript.exe'
+        : 'wscript.exe';
+
+    final proc = await Process.start(
+      wscriptExe,
+      [vbsFile.path],
+      workingDirectory: workingDirectory,
+      environment: environment,
+    );
+
+    Future.delayed(const Duration(seconds: 4), () {
+      try {
+        if (vbsFile.existsSync()) vbsFile.deleteSync();
+        if (tempDir.existsSync()) tempDir.deleteSync();
+      } catch (_) {}
+    });
+
+    return proc;
   }
 }

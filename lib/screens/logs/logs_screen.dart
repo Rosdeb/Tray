@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:iconsax_flutter/iconsax_flutter.dart';
+
 import '../../models/log_entry.dart';
 import '../../providers/app_providers.dart';
+import '../../services/device_log_service.dart';
 
 class LogsScreen extends ConsumerStatefulWidget {
   const LogsScreen({super.key});
@@ -50,9 +53,28 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    final selectedTarget = logsState.targets.firstWhere(
+      (t) => t.id == logsState.selectedTargetId,
+      orElse: () => LogTarget(
+        id: logsState.selectedTargetId ?? 'app',
+        displayName: logsState.selectedTargetId ?? 'Simulation Tray System Logs',
+        isAppLogs: logsState.selectedTargetId == 'app',
+      ),
+    );
+
     final query = logsState.searchQuery.trim().toLowerCase();
     final filtered = logsState.entries.where((entry) {
       if (entry.level.priority < logsState.filterLevel.priority) return false;
+      if (!selectedTarget.isAppLogs) {
+        if (!DeviceLogService.matchesAppFilter(
+          entry: entry,
+          mode: logsState.filterMode,
+          packageName: logsState.selectedPackage,
+          pid: logsState.activeAppPid,
+        )) {
+          return false;
+        }
+      }
       if (query.isNotEmpty) {
         final inMsg = entry.message.toLowerCase().contains(query);
         final inTag = entry.tag?.toLowerCase().contains(query) ?? false;
@@ -63,15 +85,6 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
     }).toList(growable: false);
 
     _scrollToBottomIfNeeded(filtered.length, logsState.autoScroll);
-
-    final selectedTarget = logsState.targets.firstWhere(
-      (t) => t.id == logsState.selectedTargetId,
-      orElse: () => LogTarget(
-        id: logsState.selectedTargetId ?? 'app',
-        displayName: logsState.selectedTargetId ?? 'Simulation Tray System Logs',
-        isAppLogs: logsState.selectedTargetId == 'app',
-      ),
-    );
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -280,6 +293,23 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
               ],
             ),
 
+            if (!selectedTarget.isAppLogs) ...[
+              const SizedBox(height: 10),
+              _AppFilterBar(
+                state: logsState,
+                onModeChanged: (mode) =>
+                    ref.read(deviceLogsControllerProvider.notifier).setFilterMode(mode),
+                onAutoDetect: () =>
+                    ref.read(deviceLogsControllerProvider.notifier).autoDetectApp(),
+                onSelectPackage: (pkg) =>
+                    ref.read(deviceLogsControllerProvider.notifier).setSelectedPackage(pkg),
+                onRefreshPid: () =>
+                    ref.read(deviceLogsControllerProvider.notifier).refreshPid(),
+                onLoadPackages: () =>
+                    ref.read(deviceLogsControllerProvider.notifier).loadInstalledPackages(),
+              ),
+            ],
+
             if (logsState.errorMessage != null) ...[
               const SizedBox(height: 8),
               Container(
@@ -365,6 +395,34 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
     final isStreaming = logsState.isStreaming;
 
     if (isStreaming) {
+      if (logsState.filterMode == LogFilterMode.appOnly && logsState.selectedPackage == null) {
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(CupertinoIcons.app_badge, size: 44, color: Colors.grey),
+              const SizedBox(height: 12),
+              Text(
+                'No Project App Selected',
+                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Open your app on the device and click "Auto-Detect App" to stream only your project logs.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+              ),
+              const SizedBox(height: 14),
+              FilledButton.icon(
+                onPressed: () => ref.read(deviceLogsControllerProvider.notifier).autoDetectApp(),
+                icon: const Icon(CupertinoIcons.viewfinder, size: 15),
+                label: const Text('Auto-Detect Active App'),
+              ),
+            ],
+          ),
+        );
+      }
+
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -381,8 +439,9 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
                 _searchController.clear();
                 ref.read(deviceLogsControllerProvider.notifier).setSearchQuery('');
                 ref.read(deviceLogsControllerProvider.notifier).setFilterLevel(LogLevel.verbose);
+                ref.read(deviceLogsControllerProvider.notifier).setFilterMode(LogFilterMode.all);
               },
-              child: const Text('Reset Filters'),
+              child: const Text('Reset All Filters'),
             ),
           ],
         ),
@@ -622,6 +681,416 @@ class _LogLineRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _AppFilterBar extends StatelessWidget {
+  const _AppFilterBar({
+    required this.state,
+    required this.onModeChanged,
+    required this.onAutoDetect,
+    required this.onSelectPackage,
+    required this.onRefreshPid,
+    required this.onLoadPackages,
+  });
+
+  final DeviceLogsState state;
+  final ValueChanged<LogFilterMode> onModeChanged;
+  final VoidCallback onAutoDetect;
+  final ValueChanged<String?> onSelectPackage;
+  final VoidCallback onRefreshPid;
+  final Future<void> Function() onLoadPackages;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final currentMode = state.filterMode;
+    final isAppMode = currentMode == LogFilterMode.appOnly;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              // Filter Mode Segmented Chips
+              Container(
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: theme.dividerColor.withValues(alpha: 0.25)),
+                ),
+                padding: const EdgeInsets.all(2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _ModeChip(
+                      label: 'All Logs',
+                      icon: CupertinoIcons.square_grid_2x2,
+                      isSelected: currentMode == LogFilterMode.all,
+                      onTap: () => onModeChanged(LogFilterMode.all),
+                    ),
+                    _ModeChip(
+                      label: '🎯 Project App',
+                      icon: CupertinoIcons.app_badge,
+                      isSelected: currentMode == LogFilterMode.appOnly,
+                      onTap: () => onModeChanged(LogFilterMode.appOnly),
+                    ),
+                    _ModeChip(
+                      label: 'Flutter',
+                      icon: Iconsax.code,
+                      isSelected: currentMode == LogFilterMode.flutterOnly,
+                      onTap: () => onModeChanged(LogFilterMode.flutterOnly),
+                    ),
+                    _ModeChip(
+                      label: 'React Native',
+                      icon: Iconsax.mobile,
+                      isSelected: currentMode == LogFilterMode.reactNativeOnly,
+                      onTap: () => onModeChanged(LogFilterMode.reactNativeOnly),
+                    ),
+                  ],
+                ),
+              ),
+
+              if (isAppMode) ...[
+                const SizedBox(width: 10),
+
+                // Auto-Detect Active App Button
+                FilledButton.tonalIcon(
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                    minimumSize: const Size(0, 32),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: state.isDetectingApp ? null : onAutoDetect,
+                  icon: state.isDetectingApp
+                      ? const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(CupertinoIcons.viewfinder, size: 14),
+                  label: Text(
+                    state.isDetectingApp ? 'Detecting...' : 'Auto-Detect App',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ),
+
+                const SizedBox(width: 8),
+
+                // Selected Package Chip or Pick App Button
+                if (state.selectedPackage != null) ...[
+                  Container(
+                    height: 32,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: state.activeAppPid != null ? Colors.green : Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          state.selectedPackage!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'monospace',
+                            color: colorScheme.onSurface,
+                          ),
+                        ),
+                        if (state.activeAppPid != null) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'PID: ${state.activeAppPid}',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(width: 4),
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+                          iconSize: 13,
+                          tooltip: 'Refresh PID',
+                          onPressed: onRefreshPid,
+                          icon: const Icon(CupertinoIcons.refresh),
+                        ),
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+                          iconSize: 13,
+                          tooltip: 'Clear filter',
+                          onPressed: () => onSelectPackage(null),
+                          icon: const Icon(CupertinoIcons.xmark),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                      minimumSize: const Size(0, 32),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () => _openPackagePicker(context),
+                    icon: const Icon(CupertinoIcons.list_bullet, size: 14),
+                    label: const Text('Choose App...', style: TextStyle(fontSize: 12)),
+                  ),
+                ],
+              ],
+            ],
+          ),
+        ),
+        if (isAppMode && state.detectionStatusMessage != null) ...[
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Text(
+              state.detectionStatusMessage!,
+              style: TextStyle(
+                fontSize: 11,
+                color: theme.hintColor,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  void _openPackagePicker(BuildContext context) async {
+    await onLoadPackages();
+    if (!context.mounted) return;
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => _PackagePickerDialog(
+        installedPackages: state.installedPackages,
+        onSelect: (pkg) {
+          Navigator.of(ctx).pop();
+          onSelectPackage(pkg);
+        },
+        onAutoDetect: () {
+          Navigator.of(ctx).pop();
+          onAutoDetect();
+        },
+      ),
+    );
+  }
+}
+
+class _ModeChip extends StatelessWidget {
+  const _ModeChip({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? colorScheme.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 13,
+              color: isSelected ? colorScheme.onPrimary : theme.hintColor,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PackagePickerDialog extends StatefulWidget {
+  const _PackagePickerDialog({
+    required this.installedPackages,
+    required this.onSelect,
+    required this.onAutoDetect,
+  });
+
+  final List<String> installedPackages;
+  final ValueChanged<String> onSelect;
+  final VoidCallback onAutoDetect;
+
+  @override
+  State<_PackagePickerDialog> createState() => _PackagePickerDialogState();
+}
+
+class _PackagePickerDialogState extends State<_PackagePickerDialog> {
+  final TextEditingController _customController = TextEditingController();
+  String _filter = '';
+
+  @override
+  void dispose() {
+    _customController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final filtered = widget.installedPackages.where((p) => p.toLowerCase().contains(_filter.toLowerCase())).toList();
+
+    return AlertDialog(
+      title: const Row(
+        children: [
+          Icon(CupertinoIcons.app_badge, size: 20),
+          SizedBox(width: 8),
+          Text('Select Project App'),
+        ],
+      ),
+      content: SizedBox(
+        width: 440,
+        height: 380,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _customController,
+                    style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      hintText: 'Enter package (e.g. com.example.app)',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    ),
+                    onSubmitted: (val) {
+                      if (val.trim().isNotEmpty) widget.onSelect(val.trim());
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: () {
+                    final text = _customController.text.trim();
+                    if (text.isNotEmpty) widget.onSelect(text);
+                  },
+                  child: const Text('Apply'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(36),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: widget.onAutoDetect,
+              icon: const Icon(CupertinoIcons.viewfinder, size: 15),
+              label: const Text('Detect Currently Active Phone App'),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Installed User Apps (${widget.installedPackages.length}):',
+              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              style: const TextStyle(fontSize: 11),
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: 'Filter installed apps...',
+                prefixIcon: const Icon(CupertinoIcons.search, size: 14),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              ),
+              onChanged: (val) => setState(() => _filter = val),
+            ),
+            const SizedBox(height: 6),
+            Expanded(
+              child: filtered.isEmpty
+                  ? Center(
+                      child: Text(
+                        widget.installedPackages.isEmpty
+                            ? 'No 3rd-party apps found. Enter package manually above.'
+                            : 'No apps matching "$_filter"',
+                        style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: filtered.length,
+                      itemBuilder: (ctx, i) {
+                        final pkg = filtered[i];
+                        return ListTile(
+                          dense: true,
+                          visualDensity: VisualDensity.compact,
+                          title: Text(
+                            pkg,
+                            style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                          ),
+                          onTap: () => widget.onSelect(pkg),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+      ],
     );
   }
 }

@@ -46,6 +46,7 @@ However, to start an emulator or view device logs, developers are typically forc
 | **Screen Mirroring** | Basic embedded frame | **Ultra-low latency `scrcpy` (60+ FPS)** |
 | **Real-time Logcat Console** | Studio Logcat tab only | **Integrated real-time logcat with level & tag filters** |
 | **Telemetry & Waveforms** | Profiler requires build | **Live CPU/RAM sparklines & top process monitor** |
+| **Wireless ADB / Wi-Fi** | Complex manual setup | **1-Click USB switch, pairing dialog & tray controls** |
 | **Port Conflict Prevention** | Manual troubleshooting | **Automated console & ADB port allocator** |
 
 ---
@@ -78,10 +79,15 @@ However, to start an emulator or view device logs, developers are typically forc
 
 ### 3. 🔍 Real-Time Device Logcat Viewer (Phones & Emulators)
 - **Multi-Device Support**: Switch between connected physical Android phones via USB/Wi-Fi, running virtual emulators, or Tray system logs.
+- **🎯 Project / App Log Isolation (No System Noise)**:
+  - **Auto-Detect Active App**: One-click detection scans the device for the currently active foreground application, resolves its process PID, and automatically filters out thousands of unrelated Android OS logs (`ActivityManager`, `WifiStateMachine`, `AudioTrack`, etc.).
+  - **Process PID Filtering**: Matches all logs emitted from inside the app's process in real-time, including custom log tags, `print()`, native crashes, and network requests.
+  - **Framework Presets**: Instant one-click filter modes for **Flutter / Dart** (`flutter`, `dart`, `flutter_engine`) and **React Native** (`ReactNative`, `ReactNativeJS`).
+  - **Installed App Picker**: Choose from all installed third-party user applications on the device or manually enter any custom package name.
 - **Real-Time ADB Streaming**: Streams live logcat (`adb logcat -v time`) with high-throughput 60 FPS batched UI rendering.
 - **Instant Search & Level Filtering**:
   - Filter by log severity: `Verbose+`, `Debug+`, `Info+`, `Warning+`, `Error+`, and `Fatal`.
-  - Search query filtering across message text, component tags (e.g., `Flutter`, `ActivityManager`), and process IDs (PID).
+  - Search query filtering across message text, component tags, and process IDs (PID).
 - **Console Controls**: Play/Pause live output, auto-scroll to bottom, one-click clear (`adb logcat -c`), and copy all visible logs to clipboard.
 - **Direct Tray & Dashboard Integration**: Click **"View Device Logs"** from any card or tray menu item to jump straight into live logs for that target.
 
@@ -93,18 +99,25 @@ However, to start an emulator or view device logs, developers are typically forc
 - **Conflict-Free ADB Architecture**: Shares and coordinates with Tray's internal ADB daemon to prevent connection dropping or server restarts.
 - **Flicker-Free Path Validation**: Cached background checks prevent UI reloading or progress spinners during device polling.
 
-### 5. 📊 Real-Time Device Telemetry & Waveform Monitor
+### 5. 📶 Lightweight Wireless ADB & Wi-Fi Pairing
+- **1-Click USB-to-Wi-Fi Switch**: Seamlessly transition any USB-connected physical phone to wireless mode (`adb tcpip 5555` → `adb connect <ip>:5555`) with a single click. Unplug the USB cable and continue developing wirelessly!
+- **Direct IP:Port Connect**: Connect to any Android device on the same local network by IP and port in seconds.
+- **Android 11+ Wireless Pairing**: Built-in dialog for Android 11+ pairing codes (6-digit Wi-Fi pairing code and pairing port) without needing command-line prompts.
+- **Ultra-Lightweight Architecture**: 100% on-demand execution with zero subnet ARP sweeps, zero background polling, and 0% idle CPU overhead. Perfect for low-spec laptops.
+- **Tray & Card Shortcuts**: Switch to Wi-Fi, disconnect, or trigger pairing directly from device cards or the system tray menu.
+
+### 6. 📊 Real-Time Device Telemetry & Waveform Monitor
 - **Live Hardware Waveforms**: Real-time sparkline graphs for CPU utilization, RAM consumption, and network RX/TX bandwidth.
 - **Hardware Metrics**: Battery percentage, battery temperature, battery health status, and live FPS rendering speed.
 - **Active Top Processes**: View the top resource-consuming processes running inside the Android device or host machine.
 - **Customizable Widgets**: Toggle individual telemetry tiles and configure polling intervals (1s, 2s, 5s).
 
-### 6. ⚡ Process Manager & Port Collision Guard
+### 7. ⚡ Process Manager & Port Collision Guard
 - **Automatic Port Allocation**: Assigns free even ports (`5554`, `5556`, `5558`...) to eliminate port collisions when running multiple emulators simultaneously.
 - **Active Process Monitor**: View all running `qemu-system`, `adb`, and `scrcpy` background processes with CPU/memory footprints and one-click termination.
 - **Hardware Virtualization Check**: Detects Windows Hypervisor Platform (WHPX), Android Emulator Hypervisor Driver (AEHD), Apple Hypervisor.framework, and KVM.
 
-### 7. 🪟 Desktop-First Window & Tray Experience
+### 8. 🪟 Desktop-First Window & Tray Experience
 - **Expo Orbit-Style System Tray**: Left-click or right-click the menu bar / notification tray icon to start emulators, cold boot, mirror screens, view logs, or refresh devices without opening the main window.
 - **Intelligent Resizing**: Native minimum window size (`1150 x 570` on macOS / `1100 x 560` on Windows) prevents UI collapsing while allowing free upward expansion, maximizing, and native macOS zoom.
 - **Background Minimization**: Seamlessly minimizes to the system tray; restores smoothly when clicking "Open Manager" or the macOS Dock icon.

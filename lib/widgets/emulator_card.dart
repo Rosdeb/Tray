@@ -14,6 +14,8 @@ class EmulatorCard extends StatelessWidget {
     required this.onStop,
     this.onMirror,
     this.onViewLogs,
+    this.onSwitchToWifi,
+    this.onDisconnectWifi,
     this.assignedPort,
     super.key,
   });
@@ -25,6 +27,8 @@ class EmulatorCard extends StatelessWidget {
   final VoidCallback onStop;
   final VoidCallback? onMirror;
   final VoidCallback? onViewLogs;
+  final VoidCallback? onSwitchToWifi;
+  final VoidCallback? onDisconnectWifi;
   final bool isLaunching;
   final int? assignedPort;
 
@@ -178,6 +182,23 @@ class EmulatorCard extends StatelessWidget {
                   ),
                 ),
               ],
+              if (onSwitchToWifi != null && !emulator.isUnauthorized && emulator.connectionType != 'Wi-Fi') ...[
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: 'Switch to Wireless Wi-Fi ADB mode',
+                  child: OutlinedButton.icon(
+                    onPressed: onSwitchToWifi,
+                    icon: const Icon(CupertinoIcons.wifi, size: 14),
+                    label: const Text('Wi-Fi', style: TextStyle(fontSize: 12)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.teal,
+                      side: BorderSide(color: Colors.teal.withValues(alpha: 0.5)),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(width: 8),
               PopupMenuButton<String>(
                 tooltip: 'More actions',
@@ -185,6 +206,10 @@ class EmulatorCard extends StatelessWidget {
                   switch (value) {
                     case 'mirror':
                       onMirror?.call();
+                    case 'wifi_switch':
+                      onSwitchToWifi?.call();
+                    case 'wifi_disconnect':
+                      onDisconnectWifi?.call();
                     case 'logs':
                       onViewLogs?.call();
                     case 'details':
@@ -196,6 +221,16 @@ class EmulatorCard extends StatelessWidget {
                     const PopupMenuItem(
                       value: 'mirror',
                       child: Text('Mirror screen with scrcpy'),
+                    ),
+                  if (!emulator.isUnauthorized && emulator.connectionType != 'Wi-Fi' && onSwitchToWifi != null)
+                    const PopupMenuItem(
+                      value: 'wifi_switch',
+                      child: Text('Switch to Wireless Wi-Fi Mode'),
+                    ),
+                  if (emulator.connectionType == 'Wi-Fi' && onDisconnectWifi != null)
+                    const PopupMenuItem(
+                      value: 'wifi_disconnect',
+                      child: Text('Disconnect Wireless (adb disconnect)'),
                     ),
                   if (!emulator.isUnauthorized && onViewLogs != null)
                     const PopupMenuItem(

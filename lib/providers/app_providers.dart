@@ -17,6 +17,7 @@ import '../models/log_entry.dart';
 import '../models/system_process.dart';
 import '../repositories/emulator_repository.dart';
 import '../services/adb_service.dart';
+import '../services/adb_wireless_service.dart';
 import '../services/android_sdk_detection_service.dart';
 import '../services/app_logger.dart';
 import '../services/device_log_service.dart';
@@ -43,6 +44,10 @@ final settingsServiceProvider = Provider<SettingsService>(
 );
 
 final adbServiceProvider = Provider<AdbService>((ref) => AdbService());
+
+final adbWirelessServiceProvider = Provider<AdbWirelessService>(
+  (ref) => const AdbWirelessService(),
+);
 
 final deviceLogServiceProvider = Provider<DeviceLogService>(
   (ref) => DeviceLogService(adbService: ref.watch(adbServiceProvider)),
@@ -467,6 +472,58 @@ class EmulatorController extends AsyncNotifier<EmulatorState> {
     );
   }
 
+  /// Switches a USB-connected phone to Wi-Fi mode
+  Future<AdbWirelessResult> switchDeviceToWifi(Emulator emulator, {int port = 5555}) async {
+    final sdk = state.value?.sdk;
+    if (sdk == null) {
+      return const AdbWirelessResult(success: false, message: 'ADB is not configured');
+    }
+    final serial = emulator.serial ?? emulator.name;
+    final wirelessService = ref.read(adbWirelessServiceProvider);
+    final result = await wirelessService.switchUsbToWifi(sdk.adbPath, serial, port: port);
+    if (result.success) {
+      await refreshSilently();
+    }
+    return result;
+  }
+
+  /// Connects to an Android device via IP:Port
+  Future<AdbWirelessResult> connectWireless(String ip, {int port = 5555}) async {
+    final sdk = state.value?.sdk;
+    if (sdk == null) {
+      return const AdbWirelessResult(success: false, message: 'ADB is not configured');
+    }
+    final wirelessService = ref.read(adbWirelessServiceProvider);
+    final result = await wirelessService.connect(sdk.adbPath, ip, port: port);
+    if (result.success) {
+      await refreshSilently();
+    }
+    return result;
+  }
+
+  /// Disconnects a wireless device
+  Future<bool> disconnectWireless(Emulator emulator) async {
+    final sdk = state.value?.sdk;
+    if (sdk == null) return false;
+    final target = emulator.serial ?? emulator.name;
+    final wirelessService = ref.read(adbWirelessServiceProvider);
+    final disconnected = await wirelessService.disconnect(sdk.adbPath, target);
+    if (disconnected) {
+      await refreshSilently();
+    }
+    return disconnected;
+  }
+
+  /// Pairs an Android 11+ device using wireless pairing code
+  Future<AdbWirelessResult> pairWirelessDevice(String ip, int pairPort, String pairingCode) async {
+    final sdk = state.value?.sdk;
+    if (sdk == null) {
+      return const AdbWirelessResult(success: false, message: 'ADB is not configured');
+    }
+    final wirelessService = ref.read(adbWirelessServiceProvider);
+    return wirelessService.pair(sdk.adbPath, ip, pairPort, pairingCode);
+  }
+
   /// Create a new virtual device
   Future<void> createDevice({
     required String name,
@@ -882,6 +939,12 @@ class DeviceLogsState {
     this.isStreaming = false,
     this.isPaused = false,
     this.filterLevel = LogLevel.verbose,
+    this.filterMode = LogFilterMode.all,
+    this.selectedPackage,
+    this.activeAppPid,
+    this.installedPackages = const <String>[],
+    this.isDetectingApp = false,
+    this.detectionStatusMessage,
     this.searchQuery = '',
     this.autoScroll = true,
     this.errorMessage,
@@ -893,6 +956,12 @@ class DeviceLogsState {
   final bool isStreaming;
   final bool isPaused;
   final LogLevel filterLevel;
+  final LogFilterMode filterMode;
+  final String? selectedPackage;
+  final String? activeAppPid;
+  final List<String> installedPackages;
+  final bool isDetectingApp;
+  final String? detectionStatusMessage;
   final String searchQuery;
   final bool autoScroll;
   final String? errorMessage;
@@ -904,6 +973,15 @@ class DeviceLogsState {
     bool? isStreaming,
     bool? isPaused,
     LogLevel? filterLevel,
+    LogFilterMode? filterMode,
+    String? selectedPackage,
+    bool clearSelectedPackage = false,
+    String? activeAppPid,
+    bool clearActiveAppPid = false,
+    List<String>? installedPackages,
+    bool? isDetectingApp,
+    String? detectionStatusMessage,
+    bool clearDetectionStatus = false,
     String? searchQuery,
     bool? autoScroll,
     String? errorMessage,
@@ -916,6 +994,12 @@ class DeviceLogsState {
       isStreaming: isStreaming ?? this.isStreaming,
       isPaused: isPaused ?? this.isPaused,
       filterLevel: filterLevel ?? this.filterLevel,
+      filterMode: filterMode ?? this.filterMode,
+      selectedPackage: clearSelectedPackage ? null : (selectedPackage ?? this.selectedPackage),
+      activeAppPid: clearActiveAppPid ? null : (activeAppPid ?? this.activeAppPid),
+      installedPackages: installedPackages ?? this.installedPackages,
+      isDetectingApp: isDetectingApp ?? this.isDetectingApp,
+      detectionStatusMessage: clearDetectionStatus ? null : (detectionStatusMessage ?? this.detectionStatusMessage),
       searchQuery: searchQuery ?? this.searchQuery,
       autoScroll: autoScroll ?? this.autoScroll,
       errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
@@ -1019,6 +1103,10 @@ class DeviceLogsController extends Notifier<DeviceLogsState> {
       selectedTargetId: targetId,
       clearErrorMessage: true,
       entries: const [],
+      clearSelectedPackage: true,
+      clearActiveAppPid: true,
+      installedPackages: const <String>[],
+      clearDetectionStatus: true,
     );
 
     if (target.isAppLogs) {
@@ -1146,6 +1234,101 @@ class DeviceLogsController extends Notifier<DeviceLogsState> {
 
   void setFilterLevel(LogLevel level) {
     state = state.copyWith(filterLevel: level);
+  }
+
+  void setFilterMode(LogFilterMode mode) {
+    state = state.copyWith(filterMode: mode);
+    if (mode == LogFilterMode.appOnly && (state.selectedPackage == null || state.activeAppPid == null)) {
+      autoDetectApp();
+    }
+  }
+
+  void setSelectedPackage(String? package) {
+    if (package == null || package.isEmpty) {
+      state = state.copyWith(clearSelectedPackage: true, clearActiveAppPid: true);
+      return;
+    }
+    state = state.copyWith(selectedPackage: package);
+    refreshPid();
+  }
+
+  Future<void> refreshPid() async {
+    final package = state.selectedPackage;
+    if (package == null || package.isEmpty) return;
+
+    final adbPath = ref.read(emulatorControllerProvider).value?.sdk?.adbPath;
+    final targetId = state.selectedTargetId;
+    if (adbPath == null || targetId == null || targetId == 'app') return;
+
+    final target = state.targets.firstWhere(
+      (t) => t.id == targetId,
+      orElse: () => LogTarget(id: targetId, displayName: targetId, serial: targetId),
+    );
+    final serial = target.serial ?? target.id;
+    final logService = ref.read(deviceLogServiceProvider);
+    final pid = await logService.getPidForPackage(adbPath: adbPath, serial: serial, packageName: package);
+
+    state = state.copyWith(
+      activeAppPid: pid,
+      clearActiveAppPid: pid == null,
+      detectionStatusMessage: pid != null ? 'App running (PID: $pid)' : 'App not running on device',
+    );
+  }
+
+  Future<void> autoDetectApp() async {
+    final adbPath = ref.read(emulatorControllerProvider).value?.sdk?.adbPath;
+    final targetId = state.selectedTargetId;
+    if (adbPath == null || targetId == null || targetId == 'app') return;
+
+    final target = state.targets.firstWhere(
+      (t) => t.id == targetId,
+      orElse: () => LogTarget(id: targetId, displayName: targetId, serial: targetId),
+    );
+    final serial = target.serial ?? target.id;
+    final logService = ref.read(deviceLogServiceProvider);
+
+    state = state.copyWith(isDetectingApp: true, clearDetectionStatus: true);
+
+    try {
+      final appInfo = await logService.detectForegroundApp(adbPath: adbPath, serial: serial);
+      if (appInfo != null) {
+        state = state.copyWith(
+          isDetectingApp: false,
+          selectedPackage: appInfo.packageName,
+          activeAppPid: appInfo.pid,
+          filterMode: LogFilterMode.appOnly,
+          detectionStatusMessage: appInfo.isLauncher
+              ? 'On Home Screen (${appInfo.shortName})'
+              : 'Detected ${appInfo.packageName}${appInfo.pid != null ? " (PID: ${appInfo.pid})" : ""}',
+        );
+      } else {
+        state = state.copyWith(
+          isDetectingApp: false,
+          detectionStatusMessage: 'No active foreground app detected. Launch your app on the device.',
+        );
+      }
+    } catch (e) {
+      state = state.copyWith(
+        isDetectingApp: false,
+        detectionStatusMessage: 'Detection error: $e',
+      );
+    }
+  }
+
+  Future<void> loadInstalledPackages() async {
+    final adbPath = ref.read(emulatorControllerProvider).value?.sdk?.adbPath;
+    final targetId = state.selectedTargetId;
+    if (adbPath == null || targetId == null || targetId == 'app') return;
+
+    final target = state.targets.firstWhere(
+      (t) => t.id == targetId,
+      orElse: () => LogTarget(id: targetId, displayName: targetId, serial: targetId),
+    );
+    final serial = target.serial ?? target.id;
+    final logService = ref.read(deviceLogServiceProvider);
+
+    final packages = await logService.getInstalledPackages(adbPath: adbPath, serial: serial);
+    state = state.copyWith(installedPackages: packages);
   }
 
   void setSearchQuery(String query) {

@@ -25,6 +25,38 @@ enum LogLevel {
       };
 }
 
+enum LogFilterMode {
+  all('All Device Logs'),
+  appOnly('Project App'),
+  flutterOnly('Flutter / Dart'),
+  reactNativeOnly('React Native');
+
+  const LogFilterMode(this.label);
+  final String label;
+}
+
+class AppProcessInfo {
+  const AppProcessInfo({
+    required this.packageName,
+    this.pid,
+    this.activityName,
+  });
+
+  final String packageName;
+  final String? pid;
+  final String? activityName;
+
+  bool get isLauncher =>
+      packageName.contains('launcher') ||
+      packageName.contains('nexuslauncher') ||
+      packageName == 'com.android.systemui';
+
+  String get shortName {
+    final parts = packageName.split('.');
+    return parts.isNotEmpty ? parts.last : packageName;
+  }
+}
+
 class LogEntry {
   const LogEntry({
     required this.timestamp,
