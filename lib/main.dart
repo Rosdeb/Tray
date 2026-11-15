@@ -20,7 +20,6 @@ Future<void> main() async {
     final windowOptions = WindowOptions(
       size: windowSize,
       minimumSize: windowSize,
-      maximumSize: windowSize,
       center: true,
       backgroundColor: Colors.transparent,
       skipTaskbar: false,
@@ -28,9 +27,10 @@ Future<void> main() async {
     );
     await windowManager.waitUntilReadyToShow(windowOptions, () async {
       await windowManager.setSize(windowSize);
+      await windowManager.setMinimumSize(windowSize);
       await windowManager.center();
-      await windowManager.setResizable(false);
-      await windowManager.setMaximizable(false);
+      await windowManager.setResizable(true);
+      await windowManager.setMaximizable(true);
       await windowManager.setHasShadow(true);
       await windowManager.show();
       await windowManager.focus();

@@ -108,7 +108,7 @@ class EmulatorService {
       throw ProcessException(emulatorPath, const <String>['-list-avds'], result.stderr.toString(), result.exitCode);
     }
 
-    final runningNames = await _runningAvdNames(adbPath);
+    final runningSerials = await _runningAvdSerials(adbPath);
     final avdHome = _avdHome();
     return result.stdout
         .toString()
@@ -120,7 +120,8 @@ class EmulatorService {
               avdPath: avdHome == null ? null : p.join(avdHome, '$name.avd'),
               isFavorite: favorites.contains(name),
               lastUsedAt: lastLaunchByName[name],
-              status: runningNames.contains(name) ? EmulatorStatus.running : EmulatorStatus.offline,
+              status: runningSerials.containsKey(name) ? EmulatorStatus.running : EmulatorStatus.offline,
+              serial: runningSerials[name],
             ))
         .toList(growable: false)
       ..sort(_sortEmulators);
@@ -218,23 +219,24 @@ class EmulatorService {
     return false;
   }
 
-  Future<Set<String>> _runningAvdNames(String adbPath) async {
+  Future<Map<String, String>> _runningAvdSerials(String adbPath) async {
     try {
       final devices = await _adbService.devices(adbPath);
-      final names = <String>{};
+      final map = <String, String>{};
       for (final line in devices) {
         final parts = line.split(RegExp(r'\s+'));
         if (parts.isEmpty || !parts.first.startsWith('emulator-')) {
           continue;
         }
-        final name = await _adbService.avdName(adbPath, parts.first);
+        final serial = parts.first;
+        final name = await _adbService.avdName(adbPath, serial);
         if (name != null && name.isNotEmpty && !name.startsWith('OK')) {
-          names.add(name);
+          map[name] = serial;
         }
       }
-      return names;
+      return map;
     } catch (_) {
-      return <String>{};
+      return <String, String>{};
     }
   }
 
@@ -244,6 +246,7 @@ class EmulatorService {
     required bool isFavorite,
     required DateTime? lastUsedAt,
     required EmulatorStatus status,
+    String? serial,
   }) {
     final config = _readAvdConfig(avdPath);
     final apiLevel = int.tryParse(config['image.sysdir.1']?.split('android-').last.split(RegExp(r'[\\/;]')).first ?? '');
@@ -262,6 +265,7 @@ class EmulatorService {
       isFavorite: isFavorite,
       status: status,
       deviceType: _deviceType(name, config),
+      serial: serial,
     );
   }
 

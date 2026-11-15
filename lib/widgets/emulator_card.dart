@@ -13,6 +13,7 @@ class EmulatorCard extends StatelessWidget {
     required this.isLaunching,
     required this.onStop,
     this.onMirror,
+    this.onViewLogs,
     this.assignedPort,
     super.key,
   });
@@ -23,6 +24,7 @@ class EmulatorCard extends StatelessWidget {
   final VoidCallback onColdBoot;
   final VoidCallback onStop;
   final VoidCallback? onMirror;
+  final VoidCallback? onViewLogs;
   final bool isLaunching;
   final int? assignedPort;
 
@@ -183,6 +185,8 @@ class EmulatorCard extends StatelessWidget {
                   switch (value) {
                     case 'mirror':
                       onMirror?.call();
+                    case 'logs':
+                      onViewLogs?.call();
                     case 'details':
                       _showDetails(context);
                   }
@@ -192,6 +196,11 @@ class EmulatorCard extends StatelessWidget {
                     const PopupMenuItem(
                       value: 'mirror',
                       child: Text('Mirror screen with scrcpy'),
+                    ),
+                  if (!emulator.isUnauthorized && onViewLogs != null)
+                    const PopupMenuItem(
+                      value: 'logs',
+                      child: Text('View Device Logs (logcat)'),
                     ),
                   const PopupMenuItem(value: 'details', child: Text('View Details')),
                 ],
@@ -245,6 +254,8 @@ class EmulatorCard extends StatelessWidget {
                       onColdBoot();
                     case 'mirror':
                       onMirror?.call();
+                    case 'logs':
+                      onViewLogs?.call();
                     case 'stop':
                       onStop();
                     case 'details':
@@ -260,6 +271,11 @@ class EmulatorCard extends StatelessWidget {
                     const PopupMenuItem(
                       value: 'mirror',
                       child: Text('Mirror screen with scrcpy'),
+                    ),
+                  if (emulator.isRunning && onViewLogs != null)
+                    const PopupMenuItem(
+                      value: 'logs',
+                      child: Text('View Device Logs (logcat)'),
                     ),
                   PopupMenuItem(
                     value: 'stop',

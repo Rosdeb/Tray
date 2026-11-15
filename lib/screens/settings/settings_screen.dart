@@ -24,7 +24,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsControllerProvider);
     final controller = ref.read(settingsControllerProvider.notifier);
-    final emuState = ref.watch(emulatorControllerProvider).value;
+    final sdk = ref.watch(emulatorControllerProvider.select((s) => s.value?.sdk));
     final accelAsync = ref.watch(hardwareAccelerationProvider);
     final scrcpyInfoAsync = ref.watch(scrcpyInfoProvider);
 
@@ -47,41 +47,43 @@ class SettingsScreen extends ConsumerWidget {
             _EnvironmentDetailRow(
               icon: CupertinoIcons.layers_alt_fill,
               label: 'JDK 17+ (Java Home)',
-              value: emuState?.sdk?.javaHome ?? 'Portable JDK / System JDK',
-              statusOk: emuState?.sdk?.javaHome != null,
+              value: sdk?.javaHome ?? 'Portable JDK / System JDK',
+              statusOk: sdk?.javaHome != null,
             ),
             const Divider(height: 16),
             _EnvironmentDetailRow(
               icon: CupertinoIcons.folder,
               label: 'Android SDK Root',
-              value: emuState?.sdk?.path ?? 'Not configured',
-              statusOk: emuState?.sdk != null,
+              value: sdk?.path ?? 'Not configured',
+              statusOk: sdk != null,
             ),
             const Divider(height: 16),
             _EnvironmentDetailRow(
               icon: CupertinoIcons.chevron_left_slash_chevron_right,
               label: 'cmdline-tools (sdkmanager & avdmanager)',
-              value: emuState?.sdk?.hasCmdlineTools == true ? 'Installed' : 'Missing',
-              statusOk: emuState?.sdk?.hasCmdlineTools == true,
+              value: sdk?.hasCmdlineTools == true ? 'Installed' : 'Missing',
+              statusOk: sdk?.hasCmdlineTools == true,
             ),
             const Divider(height: 16),
             _EnvironmentDetailRow(
               icon: CupertinoIcons.macwindow,
               label: 'Emulator Binary',
-              value: emuState?.sdk?.hasEmulator == true
-                  ? (emuState?.sdk?.version ?? emuState!.sdk!.emulatorPath)
+              value: sdk?.hasEmulator == true
+                  ? (sdk?.version ?? sdk!.emulatorPath)
                   : 'Missing',
-              statusOk: emuState?.sdk?.hasEmulator == true,
+              statusOk: sdk?.hasEmulator == true,
             ),
             const Divider(height: 16),
             _EnvironmentDetailRow(
               icon: CupertinoIcons.link,
               label: 'Platform Tools (ADB)',
-              value: emuState?.sdk?.hasAdb == true ? emuState!.sdk!.adbPath : 'Missing',
-              statusOk: emuState?.sdk?.hasAdb == true,
+              value: sdk?.hasAdb == true ? sdk!.adbPath : 'Missing',
+              statusOk: sdk?.hasAdb == true,
             ),
             const Divider(height: 16),
             accelAsync.when(
+              skipLoadingOnReload: true,
+              skipLoadingOnRefresh: true,
               data: (info) => _EnvironmentDetailRow(
                 icon: CupertinoIcons.speedometer,
                 label: 'Hardware Acceleration',
@@ -103,6 +105,8 @@ class SettingsScreen extends ConsumerWidget {
             ),
             const Divider(height: 16),
             scrcpyInfoAsync.when(
+              skipLoadingOnReload: true,
+              skipLoadingOnRefresh: true,
               data: (info) => _EnvironmentDetailRow(
                 icon: CupertinoIcons.tv,
                 label: 'Screen Mirroring (scrcpy)',
@@ -159,7 +163,7 @@ class SettingsScreen extends ConsumerWidget {
             Builder(
               builder: (innerContext) {
                 final isCustom = settings.sdkPath != null && settings.sdkPath!.trim().isNotEmpty;
-                final detectedSdk = emuState?.sdk;
+                final detectedSdk = sdk;
                 final isSdkConfigured = detectedSdk != null;
 
                 return Column(
@@ -799,6 +803,8 @@ class _ScrcpySettingsSection extends ConsumerWidget {
       children: <Widget>[
         const SizedBox(height: 10),
         scrcpyInfoAsync.when(
+          skipLoadingOnReload: true,
+          skipLoadingOnRefresh: true,
           loading: () => const Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
             child: Row(

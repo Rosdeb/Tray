@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,11 +13,13 @@ import '../models/dashboard_statistics.dart';
 import '../models/device_metrics.dart';
 import '../models/emulator.dart';
 import '../models/hardware_acceleration.dart';
+import '../models/log_entry.dart';
 import '../models/system_process.dart';
 import '../repositories/emulator_repository.dart';
 import '../services/adb_service.dart';
 import '../services/android_sdk_detection_service.dart';
 import '../services/app_logger.dart';
+import '../services/device_log_service.dart';
 import '../services/device_monitor_service.dart';
 import '../services/emulator_service.dart';
 import '../services/notification_service.dart';
@@ -39,6 +43,10 @@ final settingsServiceProvider = Provider<SettingsService>(
 );
 
 final adbServiceProvider = Provider<AdbService>((ref) => AdbService());
+
+final deviceLogServiceProvider = Provider<DeviceLogService>(
+  (ref) => DeviceLogService(adbService: ref.watch(adbServiceProvider)),
+);
 
 final emulatorServiceProvider = Provider<EmulatorService>(
   (ref) => EmulatorService(ref.watch(adbServiceProvider)),
@@ -141,8 +149,8 @@ final updateCheckProvider = FutureProvider<UpdateInfo?>((ref) async {
 
 final hardwareAccelerationProvider = FutureProvider<HardwareAccelerationInfo>((ref) async {
   final repo = ref.watch(emulatorRepositoryProvider);
-  final emuState = ref.watch(emulatorControllerProvider).value;
-  return repo.checkHardwareAcceleration(emuState?.sdk);
+  final sdk = ref.watch(emulatorControllerProvider.select((s) => s.value?.sdk));
+  return repo.checkHardwareAcceleration(sdk);
 });
 
 class ScrcpyInfo {
@@ -160,13 +168,13 @@ class ScrcpyInfo {
 }
 
 final scrcpyInfoProvider = FutureProvider<ScrcpyInfo>((ref) async {
-  final settings = ref.watch(settingsControllerProvider);
-  final emuState = ref.watch(emulatorControllerProvider).value;
+  final customPath = ref.watch(settingsControllerProvider.select((s) => s.scrcpyPath));
+  final sdkPath = ref.watch(emulatorControllerProvider.select((s) => s.value?.sdk?.path));
   final scrcpyService = ref.watch(scrcpyServiceProvider);
 
   final path = await scrcpyService.findExecutable(
-    customPath: settings.scrcpyPath,
-    sdkPath: emuState?.sdk?.path,
+    customPath: customPath,
+    sdkPath: sdkPath,
   );
 
   if (path == null) {
@@ -174,15 +182,15 @@ final scrcpyInfoProvider = FutureProvider<ScrcpyInfo>((ref) async {
   }
 
   final version = await scrcpyService.getVersion(
-    customPath: settings.scrcpyPath,
-    sdkPath: emuState?.sdk?.path,
+    customPath: customPath,
+    sdkPath: sdkPath,
   );
 
   return ScrcpyInfo(
     isAvailable: true,
     path: path,
     version: version,
-    isCustom: settings.scrcpyPath != null && settings.scrcpyPath!.trim().isNotEmpty,
+    isCustom: customPath != null && customPath.trim().isNotEmpty,
   );
 });
 
@@ -836,5 +844,331 @@ class DeviceMonitorController extends Notifier<DeviceMonitorState> {
     } finally {
       _isPolling = false;
     }
+  }
+}
+
+final selectedNavIndexProvider = NotifierProvider<SelectedNavIndexNotifier, int>(
+  SelectedNavIndexNotifier.new,
+);
+
+class SelectedNavIndexNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void selectTab(int index) => state = index;
+}
+
+class LogTarget {
+  const LogTarget({
+    required this.id,
+    required this.displayName,
+    this.serial,
+    this.isPhysical = false,
+    this.isAppLogs = false,
+  });
+
+  final String id;
+  final String displayName;
+  final String? serial;
+  final bool isPhysical;
+  final bool isAppLogs;
+}
+
+class DeviceLogsState {
+  const DeviceLogsState({
+    this.targets = const <LogTarget>[],
+    this.selectedTargetId,
+    this.entries = const <LogEntry>[],
+    this.isStreaming = false,
+    this.isPaused = false,
+    this.filterLevel = LogLevel.verbose,
+    this.searchQuery = '',
+    this.autoScroll = true,
+    this.errorMessage,
+  });
+
+  final List<LogTarget> targets;
+  final String? selectedTargetId;
+  final List<LogEntry> entries;
+  final bool isStreaming;
+  final bool isPaused;
+  final LogLevel filterLevel;
+  final String searchQuery;
+  final bool autoScroll;
+  final String? errorMessage;
+
+  DeviceLogsState copyWith({
+    List<LogTarget>? targets,
+    String? selectedTargetId,
+    List<LogEntry>? entries,
+    bool? isStreaming,
+    bool? isPaused,
+    LogLevel? filterLevel,
+    String? searchQuery,
+    bool? autoScroll,
+    String? errorMessage,
+    bool clearErrorMessage = false,
+  }) {
+    return DeviceLogsState(
+      targets: targets ?? this.targets,
+      selectedTargetId: selectedTargetId ?? this.selectedTargetId,
+      entries: entries ?? this.entries,
+      isStreaming: isStreaming ?? this.isStreaming,
+      isPaused: isPaused ?? this.isPaused,
+      filterLevel: filterLevel ?? this.filterLevel,
+      searchQuery: searchQuery ?? this.searchQuery,
+      autoScroll: autoScroll ?? this.autoScroll,
+      errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+    );
+  }
+}
+
+final deviceLogsControllerProvider =
+    NotifierProvider<DeviceLogsController, DeviceLogsState>(
+  DeviceLogsController.new,
+);
+
+class DeviceLogsController extends Notifier<DeviceLogsState> {
+  Process? _logcatProcess;
+  StreamSubscription<String>? _logcatSub;
+  Timer? _batchTimer;
+  final List<LogEntry> _pendingEntries = <LogEntry>[];
+  static const int _maxEntries = 2000;
+  LogEntry? _lastParsedEntry;
+
+  @override
+  DeviceLogsState build() {
+    ref.onDispose(() {
+      _cleanupStream();
+    });
+
+    ref.listen<AsyncValue<EmulatorState>>(
+      emulatorControllerProvider,
+      (prev, next) {
+        _syncTargets(next.value);
+      },
+    );
+
+    // Initial sync
+    final initialEmuState = ref.read(emulatorControllerProvider).value;
+    Future.microtask(() => _syncTargets(initialEmuState));
+
+    return const DeviceLogsState();
+  }
+
+  void _syncTargets(EmulatorState? emuState) {
+    final targets = <LogTarget>[];
+
+    if (emuState != null) {
+      for (final dev in emuState.emulators) {
+        if (dev.isPhysical && !dev.isUnauthorized) {
+          targets.add(LogTarget(
+            id: dev.serial ?? dev.name,
+            displayName: '📱 ${dev.displayName} (${dev.serial ?? "USB"})',
+            serial: dev.serial,
+            isPhysical: true,
+          ));
+        } else if (!dev.isPhysical && dev.isRunning) {
+          targets.add(LogTarget(
+            id: dev.serial ?? dev.name,
+            displayName: '🟢 ${dev.displayName} (${dev.serial ?? "emulator"})',
+            serial: dev.serial,
+            isPhysical: false,
+          ));
+        }
+      }
+    }
+
+    targets.add(const LogTarget(
+      id: 'app',
+      displayName: '💻 Simulation Tray System Logs',
+      isAppLogs: true,
+    ));
+
+    String? newSelected = state.selectedTargetId;
+    if (newSelected == null || !targets.any((t) => t.id == newSelected)) {
+      final firstDevice = targets.firstWhere((t) => !t.isAppLogs, orElse: () => targets.last);
+      newSelected = firstDevice.id;
+    }
+
+    final targetChanged = newSelected != state.selectedTargetId;
+    final targetIdsSame = state.targets.length == targets.length &&
+        List.generate(
+          targets.length,
+          (i) => targets[i].id == state.targets[i].id && targets[i].displayName == state.targets[i].displayName,
+        ).every((b) => b);
+
+    if (!targetIdsSame || targetChanged) {
+      state = state.copyWith(targets: targets, selectedTargetId: newSelected);
+    }
+
+    if (targetChanged || (!state.isStreaming && newSelected != 'app' && targets.any((t) => t.id == newSelected && !t.isAppLogs))) {
+      selectTarget(newSelected);
+    }
+  }
+
+  Future<void> selectTarget(String targetId) async {
+    _cleanupStream();
+
+    final target = state.targets.firstWhere(
+      (t) => t.id == targetId,
+      orElse: () => LogTarget(id: targetId, displayName: targetId, serial: targetId),
+    );
+
+    state = state.copyWith(
+      selectedTargetId: targetId,
+      clearErrorMessage: true,
+      entries: const [],
+    );
+
+    if (target.isAppLogs) {
+      final appLogs = ref.read(appLoggerProvider).entries;
+      state = state.copyWith(
+        entries: appLogs.toList(),
+        isStreaming: false,
+        clearErrorMessage: true,
+      );
+      return;
+    }
+
+    final adbPath = ref.read(emulatorControllerProvider).value?.sdk?.adbPath;
+    if (adbPath == null || adbPath.isEmpty || !File(adbPath).existsSync()) {
+      state = state.copyWith(
+        errorMessage: 'ADB not detected or configured. Please set SDK path in Settings.',
+        isStreaming: false,
+      );
+      return;
+    }
+
+    String? serial = target.serial;
+    if (serial == null || serial.isEmpty) {
+      final adbService = ref.read(adbServiceProvider);
+      serial = await adbService.findSerialForAvd(adbPath, target.id);
+    }
+
+    if (serial == null || serial.isEmpty) {
+      serial = target.id;
+    }
+
+    try {
+      final logService = ref.read(deviceLogServiceProvider);
+      final process = await logService.startLogcat(adbPath: adbPath, serial: serial);
+      _logcatProcess = process;
+      _lastParsedEntry = null;
+
+      _logcatSub = process.stdout
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .listen(
+        (line) {
+          if (state.isPaused) return;
+          final entry = logService.parseLine(line, previous: _lastParsedEntry);
+          _lastParsedEntry = entry;
+          _addEntry(entry);
+        },
+        onError: (err) {
+          state = state.copyWith(
+            errorMessage: 'Logcat stream error: $err',
+            isStreaming: false,
+          );
+        },
+        onDone: () {
+          state = state.copyWith(isStreaming: false);
+        },
+      );
+
+      process.stderr.listen((_) {});
+
+      state = state.copyWith(
+        isStreaming: true,
+        clearErrorMessage: true,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        errorMessage: 'Failed to start logcat: $e',
+        isStreaming: false,
+      );
+    }
+  }
+
+  void _addEntry(LogEntry entry) {
+    _pendingEntries.add(entry);
+    _batchTimer ??= Timer(const Duration(milliseconds: 100), _flushPending);
+  }
+
+  void _flushPending() {
+    _batchTimer = null;
+    if (_pendingEntries.isEmpty) return;
+
+    final updated = List<LogEntry>.of(state.entries)..addAll(_pendingEntries);
+    _pendingEntries.clear();
+
+    if (updated.length > _maxEntries) {
+      updated.removeRange(0, updated.length - _maxEntries);
+    }
+
+    state = state.copyWith(entries: updated);
+  }
+
+  Future<void> clearLogs() async {
+    _pendingEntries.clear();
+    _batchTimer?.cancel();
+    _batchTimer = null;
+
+    final targetId = state.selectedTargetId;
+    if (targetId == 'app') {
+      ref.read(appLoggerProvider).clear();
+      state = state.copyWith(entries: const []);
+      return;
+    }
+
+    state = state.copyWith(entries: const []);
+
+    final adbPath = ref.read(emulatorControllerProvider).value?.sdk?.adbPath;
+    if (adbPath != null && targetId != null) {
+      final target = state.targets.firstWhere(
+        (t) => t.id == targetId,
+        orElse: () => LogTarget(id: targetId, displayName: targetId, serial: targetId),
+      );
+      final serial = target.serial ?? target.id;
+      final logService = ref.read(deviceLogServiceProvider);
+      await logService.clearLogcat(adbPath: adbPath, serial: serial);
+    }
+  }
+
+  void togglePause() {
+    state = state.copyWith(isPaused: !state.isPaused);
+  }
+
+  void toggleAutoScroll() {
+    state = state.copyWith(autoScroll: !state.autoScroll);
+  }
+
+  void setFilterLevel(LogLevel level) {
+    state = state.copyWith(filterLevel: level);
+  }
+
+  void setSearchQuery(String query) {
+    state = state.copyWith(searchQuery: query);
+  }
+
+  Future<void> restartStream() async {
+    final currentTarget = state.selectedTargetId;
+    if (currentTarget != null) {
+      await selectTarget(currentTarget);
+    }
+  }
+
+  void _cleanupStream() {
+    _batchTimer?.cancel();
+    _batchTimer = null;
+    _pendingEntries.clear();
+    _logcatSub?.cancel();
+    _logcatSub = null;
+    try {
+      _logcatProcess?.kill(ProcessSignal.sigterm);
+    } catch (_) {}
+    _logcatProcess = null;
+    _lastParsedEntry = null;
   }
 }

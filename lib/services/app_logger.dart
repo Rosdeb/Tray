@@ -10,6 +10,16 @@ class AppLogger {
 
   List<LogEntry> get entries => List.unmodifiable(_entries);
 
+  void verbose(String message) {
+    _entries.add(LogEntry(timestamp: DateTime.now(), level: LogLevel.verbose, message: message));
+    _logger.t(message);
+  }
+
+  void debug(String message) {
+    _entries.add(LogEntry(timestamp: DateTime.now(), level: LogLevel.debug, message: message));
+    _logger.d(message);
+  }
+
   void info(String message) {
     _entries.add(LogEntry(timestamp: DateTime.now(), level: LogLevel.info, message: message));
     _logger.i(message);
@@ -24,5 +34,9 @@ class AppLogger {
     final text = error == null ? message : '$message: $error';
     _entries.add(LogEntry(timestamp: DateTime.now(), level: LogLevel.error, message: text));
     _logger.e(message, error: error);
+  }
+
+  void clear() {
+    _entries.clear();
   }
 }

@@ -24,7 +24,6 @@ class HomeShell extends ConsumerStatefulWidget {
 
 class _HomeShellState extends ConsumerState<HomeShell>
     with WindowListener {
-  int _selectedIndex = 0;
   bool _allowClose = false;
   late final AppTrayService _trayService;
 
@@ -50,8 +49,22 @@ class _HomeShellState extends ConsumerState<HomeShell>
       },
       onCheckUpdate: () => _handleManualUpdateCheck(),
       onOpenManager: () async {
+        final isMinimized = await windowManager.isMinimized();
+        if (isMinimized) {
+          await windowManager.restore();
+        }
         await windowManager.show();
         await windowManager.focus();
+      },
+      onViewDeviceLogs: (target) async {
+        final isMinimized = await windowManager.isMinimized();
+        if (isMinimized) {
+          await windowManager.restore();
+        }
+        await windowManager.show();
+        await windowManager.focus();
+        ref.read(selectedNavIndexProvider.notifier).selectTab(3);
+        ref.read(deviceLogsControllerProvider.notifier).selectTarget(target);
       },
       onLaunchEmulator: (name, {bool coldBoot = false}) async {
         final emus = ref.read(emulatorControllerProvider).value?.emulators ?? [];
@@ -163,6 +176,8 @@ class _HomeShellState extends ConsumerState<HomeShell>
       }
     });
 
+    final selectedIndex = ref.watch(selectedNavIndexProvider);
+
     final pages = [
       const DashboardScreen(),
       const MonitorScreen(),
@@ -174,11 +189,9 @@ class _HomeShellState extends ConsumerState<HomeShell>
       body: Row(
         children: [
           AppSidebar(
-            selectedIndex: _selectedIndex,
+            selectedIndex: selectedIndex,
             onChanged: (index) {
-              setState(() {
-                _selectedIndex = index;
-              });
+              ref.read(selectedNavIndexProvider.notifier).selectTab(index);
             },
           ),
 
@@ -210,7 +223,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
                   ),
 
                 Expanded(
-                  child: pages[_selectedIndex],
+                  child: pages[selectedIndex],
                 ),
               ],
             ),
@@ -617,8 +630,45 @@ class SidebarItem {
   });
 }
 
-class WindowCaptionButtons extends StatelessWidget {
+class WindowCaptionButtons extends StatefulWidget {
   const WindowCaptionButtons({super.key});
+
+  @override
+  State<WindowCaptionButtons> createState() => _WindowCaptionButtonsState();
+}
+
+class _WindowCaptionButtonsState extends State<WindowCaptionButtons> with WindowListener {
+  bool _isMaximized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    windowManager.addListener(this);
+    _checkMaximized();
+  }
+
+  @override
+  void dispose() {
+    windowManager.removeListener(this);
+    super.dispose();
+  }
+
+  Future<void> _checkMaximized() async {
+    final max = await windowManager.isMaximized();
+    if (mounted && max != _isMaximized) {
+      setState(() => _isMaximized = max);
+    }
+  }
+
+  @override
+  void onWindowMaximize() {
+    if (mounted) setState(() => _isMaximized = true);
+  }
+
+  @override
+  void onWindowUnmaximize() {
+    if (mounted) setState(() => _isMaximized = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -626,6 +676,7 @@ class WindowCaptionButtons extends StatelessWidget {
     final iconColor = isDark ? Colors.white : Colors.black87;
 
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
           padding: EdgeInsets.zero,
@@ -648,11 +699,39 @@ class WindowCaptionButtons extends StatelessWidget {
             'assets/icons/minize.png',
             width: 14,
             height: 14,
-            color: iconColor, // Remove this if your PNG already has the desired color
+            color: iconColor,
             filterQuality: FilterQuality.high,
           ),
         ),
-
+        IconButton(
+          padding: EdgeInsets.zero,
+          alignment: Alignment.center,
+          constraints: const BoxConstraints(
+            minWidth: 46,
+            minHeight: 46,
+          ),
+          style: IconButton.styleFrom(
+            fixedSize: const Size(46, 46),
+            hoverColor: isDark
+                ? Colors.white.withValues(alpha: 0.1)
+                : Colors.black.withValues(alpha: 0.05),
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.zero,
+            ),
+          ),
+          onPressed: () async {
+            if (_isMaximized) {
+              await windowManager.unmaximize();
+            } else {
+              await windowManager.maximize();
+            }
+          },
+          icon: Icon(
+            _isMaximized ? CupertinoIcons.fullscreen_exit : CupertinoIcons.square,
+            size: 14,
+            color: iconColor,
+          ),
+        ),
         IconButton(
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 46, minHeight: 46),

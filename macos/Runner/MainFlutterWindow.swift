@@ -6,14 +6,13 @@ class MainFlutterWindow: NSWindow {
     let flutterViewController = FlutterViewController()
     self.contentViewController = flutterViewController
 
-    // Enforce fixed native window bounds on macOS (1020 x 565) to prevent AppKit auto-collapsing
-    let targetSize = NSSize(width: 1020, height: 565)
+    // Enforce minimum native window bounds on macOS (1150 x 570) while allowing expansion and zoom
+    let minSize = NSSize(width: 1150, height: 570)
     var windowFrame = self.frame
-    windowFrame.size = targetSize
+    windowFrame.size = minSize
     self.setFrame(windowFrame, display: true)
-    self.minSize = targetSize
-    self.maxSize = targetSize
-    self.setContentSize(targetSize)
+    self.minSize = minSize
+    self.setContentSize(minSize)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 

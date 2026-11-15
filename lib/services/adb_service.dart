@@ -273,4 +273,30 @@ class AdbService {
     }
     return false;
   }
+
+  /// Starts a live logcat process for a device serial.
+  Future<Process> startLogcat({
+    required String adbPath,
+    required String serial,
+  }) async {
+    return Process.start(
+      adbPath,
+      <String>['-s', serial, 'logcat', '-v', 'time'],
+      runInShell: false,
+    );
+  }
+
+  /// Clears logcat buffer on device using `adb logcat -c`.
+  Future<void> clearLogcat({
+    required String adbPath,
+    required String serial,
+  }) async {
+    try {
+      await Process.run(
+        adbPath,
+        <String>['-s', serial, 'logcat', '-c'],
+        runInShell: false,
+      ).timeout(const Duration(seconds: 5));
+    } catch (_) {}
+  }
 }

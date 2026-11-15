@@ -16,6 +16,7 @@ class AppTrayService with TrayListener, WindowListener {
   Future<void> Function(String name)? _onStopEmulator;
   Future<void> Function(String name)? _onMirrorEmulator;
   Future<void> Function(String serial)? _onMirrorPhysical;
+  Future<void> Function(String target)? _onViewDeviceLogs;
 
   List<Emulator> _lastEmulators = const [];
   Set<String> _lastBooting = const {};
@@ -30,6 +31,7 @@ class AppTrayService with TrayListener, WindowListener {
     Future<void> Function(String name)? onStopEmulator,
     Future<void> Function(String name)? onMirrorEmulator,
     Future<void> Function(String serial)? onMirrorPhysical,
+    Future<void> Function(String target)? onViewDeviceLogs,
   }) async {
     if (!Platform.isWindows && !Platform.isMacOS) return;
 
@@ -41,6 +43,7 @@ class AppTrayService with TrayListener, WindowListener {
     _onStopEmulator = onStopEmulator;
     _onMirrorEmulator = onMirrorEmulator;
     _onMirrorPhysical = onMirrorPhysical;
+    _onViewDeviceLogs = onViewDeviceLogs;
 
     windowManager.addListener(this);
     trayManager.addListener(this);
@@ -108,6 +111,10 @@ class AppTrayService with TrayListener, WindowListener {
                     key: 'mirror_phys:${device.serial ?? device.name}',
                     label: 'Mirror Screen (scrcpy)',
                   ),
+                  MenuItem(
+                    key: 'logs_device:${device.serial ?? device.name}',
+                    label: 'View Device Logs (logcat)',
+                  ),
                 ],
               ),
             ),
@@ -146,6 +153,10 @@ class AppTrayService with TrayListener, WindowListener {
                     MenuItem(
                       key: 'mirror_emu:${emu.name}',
                       label: 'Mirror Screen (scrcpy)',
+                    ),
+                    MenuItem(
+                      key: 'logs_device:${emu.serial ?? emu.name}',
+                      label: 'View Device Logs (logcat)',
                     ),
                     MenuItem(
                       key: 'stop_emu:${emu.name}',
@@ -257,6 +268,9 @@ class AppTrayService with TrayListener, WindowListener {
         } else if (key.startsWith('mirror_phys:')) {
           final serial = key.substring('mirror_phys:'.length);
           await _onMirrorPhysical?.call(serial);
+        } else if (key.startsWith('logs_device:')) {
+          final target = key.substring('logs_device:'.length);
+          await _onViewDeviceLogs?.call(target);
         }
         break;
     }

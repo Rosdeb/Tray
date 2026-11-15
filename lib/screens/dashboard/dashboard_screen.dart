@@ -179,6 +179,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         onColdBoot: () => ref.read(emulatorControllerProvider.notifier).launch(emulator, coldBoot: true),
                         onStop: () => ref.read(emulatorControllerProvider.notifier).stop(emulator),
                         onMirror: () => _handleMirror(context, emulator),
+                        onViewLogs: () {
+                          ref.read(selectedNavIndexProvider.notifier).selectTab(3);
+                          ref.read(deviceLogsControllerProvider.notifier).selectTarget(
+                            emulator.serial ?? emulator.name,
+                          );
+                        },
                       );
                     },
                   ),
