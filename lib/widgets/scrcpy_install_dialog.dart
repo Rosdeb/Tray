@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -94,7 +94,7 @@ class _ScrcpyInstallDialogState extends ConsumerState<ScrcpyInstallDialog> {
               color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(CupertinoIcons.tv, color: theme.colorScheme.primary, size: 22),
+            child: Icon(Iconsax.monitor, color: theme.colorScheme.primary, size: 22),
           ),
           const SizedBox(width: 12),
           const Expanded(
@@ -126,7 +126,7 @@ class _ScrcpyInstallDialogState extends ConsumerState<ScrcpyInstallDialog> {
                 ),
                 child: Row(
                   children: [
-                    Icon(CupertinoIcons.exclamationmark_triangle_fill, color: theme.colorScheme.error, size: 20),
+                    Icon(Icons.warning_amber_rounded, color: theme.colorScheme.error, size: 20),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -178,7 +178,7 @@ class _ScrcpyInstallDialogState extends ConsumerState<ScrcpyInstallDialog> {
           ),
           FilledButton.icon(
             onPressed: _startInstallation,
-            icon: const Icon(CupertinoIcons.refresh, size: 16),
+            icon: const Icon(Icons.refresh_rounded, size: 16),
             label: const Text('Retry Download'),
           ),
         ] else if (!_isDownloading) ...[

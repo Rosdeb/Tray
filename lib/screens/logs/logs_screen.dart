@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,13 +23,16 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
   @override
   void initState() {
     super.initState();
-    _searchController.addListener(() {
-      ref.read(deviceLogsControllerProvider.notifier).setSearchQuery(_searchController.text);
-    });
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  void _onSearchChanged() {
+    ref.read(deviceLogsControllerProvider.notifier).setSearchQuery(_searchController.text);
   }
 
   @override
   void dispose() {
+    _searchController.removeListener(_onSearchChanged);
     _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -47,23 +49,9 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
     _lastEntryCount = currentCount;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final logsState = ref.watch(deviceLogsControllerProvider);
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    final selectedTarget = logsState.targets.firstWhere(
-      (t) => t.id == logsState.selectedTargetId,
-      orElse: () => LogTarget(
-        id: logsState.selectedTargetId ?? 'app',
-        displayName: logsState.selectedTargetId ?? 'Simulation Tray System Logs',
-        isAppLogs: logsState.selectedTargetId == 'app',
-      ),
-    );
-
+  List<LogEntry> _filterEntries(DeviceLogsState logsState, LogTarget selectedTarget) {
     final query = logsState.searchQuery.trim().toLowerCase();
-    final filtered = logsState.entries.where((entry) {
+    return logsState.entries.where((entry) {
       if (entry.level.priority < logsState.filterLevel.priority) return false;
       if (!selectedTarget.isAppLogs) {
         if (!DeviceLogService.matchesAppFilter(
@@ -83,6 +71,24 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
       }
       return true;
     }).toList(growable: false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final logsState = ref.watch(deviceLogsControllerProvider);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    final selectedTarget = logsState.targets.firstWhere(
+      (t) => t.id == logsState.selectedTargetId,
+      orElse: () => LogTarget(
+        id: logsState.selectedTargetId ?? 'app',
+        displayName: logsState.selectedTargetId ?? 'Simulation Tray System Logs',
+        isAppLogs: logsState.selectedTargetId == 'app',
+      ),
+    );
+
+    final filtered = _filterEntries(logsState, selectedTarget);
 
     _scrollToBottomIfNeeded(filtered.length, logsState.autoScroll);
 
@@ -104,19 +110,18 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
                         style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(width: 16),
-                      // Target Device Selector Dropdown
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: theme.dividerColor.withValues(alpha: 0.3)),
+                          color: colorScheme.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: colorScheme.outlineVariant, width: 0.5),
                         ),
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<String>(
                             value: logsState.selectedTargetId,
                             isDense: true,
-                            icon: const Icon(CupertinoIcons.chevron_down, size: 14),
+                            icon: const Icon(Icons.keyboard_arrow_down, size: 16),
                             style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                             items: logsState.targets.map((target) {
                               return DropdownMenuItem<String>(
@@ -133,7 +138,6 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      // Status Badge
                       _StatusBadge(
                         isStreaming: logsState.isStreaming,
                         isPaused: logsState.isPaused,
@@ -147,18 +151,16 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
                 Wrap(
                   spacing: 6,
                   children: [
-                    // Pause / Resume Button
                     IconButton.filledTonal(
                       tooltip: logsState.isPaused ? 'Resume log stream' : 'Pause log stream',
                       onPressed: selectedTarget.isAppLogs
                           ? null
                           : () => ref.read(deviceLogsControllerProvider.notifier).togglePause(),
                       icon: Icon(
-                        logsState.isPaused ? CupertinoIcons.play_fill : CupertinoIcons.pause_fill,
+                        logsState.isPaused ? Icons.play_arrow : Icons.pause,
                         size: 16,
                       ),
                     ),
-                    // Auto-Scroll Toggle Button
                     IconButton.filledTonal(
                       tooltip: logsState.autoScroll ? 'Auto-scroll ON (click to disable)' : 'Auto-scroll OFF (click to enable)',
                       style: logsState.autoScroll
@@ -168,15 +170,13 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
                             )
                           : null,
                       onPressed: () => ref.read(deviceLogsControllerProvider.notifier).toggleAutoScroll(),
-                      icon: const Icon(CupertinoIcons.arrow_down_to_line, size: 16),
+                      icon: const Icon(Icons.vertical_align_bottom, size: 16),
                     ),
-                    // Clear Logs Button
                     IconButton.filledTonal(
                       tooltip: 'Clear log output (adb logcat -c)',
                       onPressed: () => ref.read(deviceLogsControllerProvider.notifier).clearLogs(),
-                      icon: const Icon(CupertinoIcons.trash, size: 16),
+                      icon: const Icon(Icons.delete_outline, size: 16),
                     ),
-                    // Copy All Filtered Logs Button
                     IconButton.filledTonal(
                       tooltip: 'Copy visible logs to clipboard',
                       onPressed: filtered.isEmpty
@@ -191,21 +191,19 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
                                   SnackBar(
                                     content: Text('Copied ${filtered.length} log lines to clipboard'),
                                     duration: const Duration(seconds: 2),
-                                    behavior: SnackBarBehavior.floating,
                                   ),
                                 );
                               }
                             },
-                      icon: const Icon(CupertinoIcons.doc_on_clipboard, size: 16),
+                      icon: const Icon(Icons.copy_outlined, size: 16),
                     ),
-                    // Restart / Refresh Button
                     IconButton.filledTonal(
                       tooltip: 'Restart logcat stream',
                       onPressed: () async {
                         await ref.read(emulatorControllerProvider.notifier).refresh();
                         await ref.read(deviceLogsControllerProvider.notifier).restartStream();
                       },
-                      icon: const Icon(CupertinoIcons.refresh, size: 16),
+                      icon: const Icon(Icons.refresh, size: 16),
                     ),
                   ],
                 ),
@@ -217,7 +215,6 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
             // Search & Log Level Filter Bar
             Row(
               children: [
-                // Search Input
                 Expanded(
                   child: SizedBox(
                     height: 36,
@@ -227,26 +224,15 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
                       decoration: InputDecoration(
                         isDense: true,
                         hintText: 'Filter by message, tag (e.g. Flutter), or PID...',
-                        hintStyle: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
-                        prefixIcon: const Icon(CupertinoIcons.search, size: 16),
+                        prefixIcon: const Icon(Icons.search, size: 16),
                         suffixIcon: _searchController.text.isNotEmpty
                             ? IconButton(
-                                icon: const Icon(CupertinoIcons.clear_circled_solid, size: 14),
+                                icon: const Icon(Icons.clear, size: 14),
                                 onPressed: () {
                                   _searchController.clear();
-                                  ref.read(deviceLogsControllerProvider.notifier).setSearchQuery('');
                                 },
                               )
                             : null,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3)),
-                        ),
                       ),
                     ),
                   ),
@@ -254,13 +240,12 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
 
                 const SizedBox(width: 12),
 
-                // Log Level Selector
                 Container(
                   height: 36,
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: theme.dividerColor.withValues(alpha: 0.3)),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: colorScheme.outlineVariant, width: 0.5),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<LogLevel>(
@@ -285,10 +270,9 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
 
                 const SizedBox(width: 12),
 
-                // Line Counter
                 Text(
                   '${filtered.length} lines',
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                  style: theme.textTheme.bodySmall,
                 ),
               ],
             ),
@@ -316,12 +300,12 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.red.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(CupertinoIcons.exclamationmark_triangle_fill, color: Colors.red, size: 16),
+                    const Icon(Icons.warning_amber, color: Colors.red, size: 16),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -340,13 +324,9 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color: theme.brightness == Brightness.dark
-                      ? const Color(0xFF14171A)
-                      : const Color(0xFFF7F9FA),
+                  color: colorScheme.surfaceContainerLowest,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: theme.dividerColor.withValues(alpha: 0.4),
-                  ),
+                  border: Border.all(color: colorScheme.outlineVariant, width: 0.5),
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(10),
@@ -372,7 +352,9 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                               itemCount: filtered.length,
                               itemBuilder: (context, index) {
-                                return _LogLineRow(entry: filtered[index]);
+                                return RepaintBoundary(
+                                  child: _LogLineRow(entry: filtered[index]),
+                                );
                               },
                             ),
                           ),
@@ -400,7 +382,7 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(CupertinoIcons.app_badge, size: 44, color: Colors.grey),
+              const Icon(Iconsax.mobile, size: 44, color: Colors.grey),
               const SizedBox(height: 12),
               Text(
                 'No Project App Selected',
@@ -410,12 +392,12 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
               Text(
                 'Open your app on the device and click "Auto-Detect App" to stream only your project logs.',
                 textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                style: theme.textTheme.bodySmall,
               ),
               const SizedBox(height: 14),
               FilledButton.icon(
                 onPressed: () => ref.read(deviceLogsControllerProvider.notifier).autoDetectApp(),
-                icon: const Icon(CupertinoIcons.viewfinder, size: 15),
+                icon: const Icon(Iconsax.scan, size: 15),
                 label: const Text('Auto-Detect Active App'),
               ),
             ],
@@ -427,17 +409,16 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(CupertinoIcons.search, size: 40, color: Colors.grey),
+            const Icon(Icons.search_off, size: 40, color: Colors.grey),
             const SizedBox(height: 12),
             Text(
               'No logs matching the current filter.',
-              style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+              style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 10),
             OutlinedButton(
               onPressed: () {
                 _searchController.clear();
-                ref.read(deviceLogsControllerProvider.notifier).setSearchQuery('');
                 ref.read(deviceLogsControllerProvider.notifier).setFilterLevel(LogLevel.verbose);
                 ref.read(deviceLogsControllerProvider.notifier).setFilterMode(LogFilterMode.all);
               },
@@ -455,7 +436,7 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(CupertinoIcons.device_phone_portrait, size: 48, color: Colors.grey),
+              const Icon(Iconsax.mobile, size: 48, color: Colors.grey),
               const SizedBox(height: 14),
               Text(
                 'No Android Devices or Emulators Active',
@@ -465,7 +446,7 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
               Text(
                 'Connect a physical phone via USB/Wi-Fi or launch an emulator from the Dashboard to stream real-time logcat output.',
                 textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+                style: theme.textTheme.bodyMedium,
               ),
               const SizedBox(height: 16),
               Row(
@@ -475,7 +456,7 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
                     onPressed: () {
                       ref.read(selectedNavIndexProvider.notifier).selectTab(0);
                     },
-                    icon: const Icon(CupertinoIcons.play_fill, size: 14),
+                    icon: const Icon(Icons.play_arrow, size: 14),
                     label: const Text('Go to Dashboard'),
                   ),
                   const SizedBox(width: 12),
@@ -483,7 +464,7 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
                     onPressed: () {
                       ref.read(deviceLogsControllerProvider.notifier).selectTarget('app');
                     },
-                    icon: const Icon(CupertinoIcons.macwindow, size: 14),
+                    icon: const Icon(Iconsax.monitor, size: 14),
                     label: const Text('View App System Logs'),
                   ),
                 ],
@@ -498,20 +479,20 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(CupertinoIcons.doc_text, size: 40, color: Colors.grey),
+          const Icon(Iconsax.document_text, size: 40, color: Colors.grey),
           const SizedBox(height: 12),
           Text(
             selectedTarget.isAppLogs
                 ? 'No system logs recorded for this session.'
                 : 'Waiting for device log output...',
-            style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+            style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: () {
               ref.read(deviceLogsControllerProvider.notifier).restartStream();
             },
-            icon: const Icon(CupertinoIcons.refresh, size: 14),
+            icon: const Icon(Icons.refresh, size: 14),
             label: const Text('Start / Reconnect'),
           ),
         ],
@@ -565,7 +546,7 @@ class _StatusBadge extends StatelessWidget {
         child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(CupertinoIcons.circle_fill, color: Colors.green, size: 8),
+            Icon(Icons.circle, color: Colors.green, size: 8),
             SizedBox(width: 4),
             Text('LIVE', style: TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.bold)),
           ],
@@ -589,6 +570,13 @@ class _LogLineRow extends StatelessWidget {
 
   final LogEntry entry;
 
+  static const _monoStyle = TextStyle(fontFamily: 'monospace', fontSize: 11);
+  static const _monoSmallStyle = TextStyle(fontFamily: 'monospace', fontSize: 10);
+  static const _timestampStyle = TextStyle(fontFamily: 'monospace', fontSize: 11, color: Colors.grey);
+  static const _tagStyle = TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.w600, color: Colors.cyan);
+  static const _pidStyle = TextStyle(fontFamily: 'monospace', fontSize: 10, color: Colors.grey);
+  static const _separatorStyle = TextStyle(fontFamily: 'monospace', fontSize: 11, color: Colors.grey);
+
   @override
   Widget build(BuildContext context) {
     final (badgeBg, badgeFg) = switch (entry.level) {
@@ -610,20 +598,11 @@ class _LogLineRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Timestamp
           if (entry.timeFormatted != null) ...[
-            Text(
-              entry.timeFormatted!,
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 11,
-                color: Colors.grey,
-              ),
-            ),
+            Text(entry.timeFormatted!, style: _timestampStyle),
             const SizedBox(width: 8),
           ],
 
-          // Level badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
             decoration: BoxDecoration(
@@ -632,51 +611,22 @@ class _LogLineRow extends StatelessWidget {
             ),
             child: Text(
               entry.level.shortCode,
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: badgeFg,
-              ),
+              style: _monoSmallStyle.copyWith(fontWeight: FontWeight.bold, color: badgeFg),
             ),
           ),
           const SizedBox(width: 8),
 
-          // Tag
           if (entry.tag != null && entry.tag!.isNotEmpty) ...[
-            Text(
-              entry.tag!,
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: Colors.cyan,
-              ),
-            ),
+            Text(entry.tag!, style: _tagStyle),
             if (entry.pid != null && entry.pid!.isNotEmpty)
-              Text(
-                '(${entry.pid})',
-                style: const TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 10,
-                  color: Colors.grey,
-                ),
-              ),
-            const Text(
-              ': ',
-              style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: Colors.grey),
-            ),
+              Text('(${entry.pid})', style: _pidStyle),
+            const Text(': ', style: _separatorStyle),
           ],
 
-          // Message
           Expanded(
             child: Text(
               entry.message,
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 11,
-                color: messageColor,
-              ),
+              style: messageColor != null ? _monoStyle.copyWith(color: messageColor) : _monoStyle,
             ),
           ),
         ],
@@ -716,12 +666,11 @@ class _AppFilterBar extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              // Filter Mode Segmented Chips
               Container(
                 decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: theme.dividerColor.withValues(alpha: 0.25)),
+                  color: colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: colorScheme.outlineVariant, width: 0.5),
                 ),
                 padding: const EdgeInsets.all(2),
                 child: Row(
@@ -729,13 +678,13 @@ class _AppFilterBar extends StatelessWidget {
                   children: [
                     _ModeChip(
                       label: 'All Logs',
-                      icon: CupertinoIcons.square_grid_2x2,
+                      icon: Icons.list,
                       isSelected: currentMode == LogFilterMode.all,
                       onTap: () => onModeChanged(LogFilterMode.all),
                     ),
                     _ModeChip(
-                      label: '🎯 Project App',
-                      icon: CupertinoIcons.app_badge,
+                      label: 'Project App',
+                      icon: Iconsax.mobile,
                       isSelected: currentMode == LogFilterMode.appOnly,
                       onTap: () => onModeChanged(LogFilterMode.appOnly),
                     ),
@@ -758,12 +707,11 @@ class _AppFilterBar extends StatelessWidget {
               if (isAppMode) ...[
                 const SizedBox(width: 10),
 
-                // Auto-Detect Active App Button
                 FilledButton.tonalIcon(
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
                     minimumSize: const Size(0, 32),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   onPressed: state.isDetectingApp ? null : onAutoDetect,
                   icon: state.isDetectingApp
@@ -772,7 +720,7 @@ class _AppFilterBar extends StatelessWidget {
                           height: 12,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(CupertinoIcons.viewfinder, size: 14),
+                      : const Icon(Iconsax.scan, size: 14),
                   label: Text(
                     state.isDetectingApp ? 'Detecting...' : 'Auto-Detect App',
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
@@ -781,14 +729,13 @@ class _AppFilterBar extends StatelessWidget {
 
                 const SizedBox(width: 8),
 
-                // Selected Package Chip or Pick App Button
                 if (state.selectedPackage != null) ...[
                   Container(
                     height: 32,
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(8),
+                      color: colorScheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
                     ),
                     child: Row(
@@ -837,7 +784,7 @@ class _AppFilterBar extends StatelessWidget {
                           iconSize: 13,
                           tooltip: 'Refresh PID',
                           onPressed: onRefreshPid,
-                          icon: const Icon(CupertinoIcons.refresh),
+                          icon: const Icon(Icons.refresh),
                         ),
                         IconButton(
                           padding: EdgeInsets.zero,
@@ -845,7 +792,7 @@ class _AppFilterBar extends StatelessWidget {
                           iconSize: 13,
                           tooltip: 'Clear filter',
                           onPressed: () => onSelectPackage(null),
-                          icon: const Icon(CupertinoIcons.xmark),
+                          icon: const Icon(Icons.close),
                         ),
                       ],
                     ),
@@ -855,10 +802,10 @@ class _AppFilterBar extends StatelessWidget {
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
                       minimumSize: const Size(0, 32),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                     onPressed: () => _openPackagePicker(context),
-                    icon: const Icon(CupertinoIcons.list_bullet, size: 14),
+                    icon: const Icon(Icons.list, size: 14),
                     label: const Text('Choose App...', style: TextStyle(fontSize: 12)),
                   ),
                 ],
@@ -872,11 +819,7 @@ class _AppFilterBar extends StatelessWidget {
             padding: const EdgeInsets.only(left: 4),
             child: Text(
               state.detectionStatusMessage!,
-              style: TextStyle(
-                fontSize: 11,
-                color: theme.hintColor,
-                fontStyle: FontStyle.italic,
-              ),
+              style: theme.textTheme.labelSmall?.copyWith(fontStyle: FontStyle.italic),
             ),
           ),
         ],
@@ -925,13 +868,13 @@ class _ModeChip extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
+      borderRadius: BorderRadius.circular(8),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: isSelected ? colorScheme.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -939,7 +882,7 @@ class _ModeChip extends StatelessWidget {
             Icon(
               icon,
               size: 13,
-              color: isSelected ? colorScheme.onPrimary : theme.hintColor,
+              color: isSelected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
             ),
             const SizedBox(width: 5),
             Text(
@@ -990,7 +933,7 @@ class _PackagePickerDialogState extends State<_PackagePickerDialog> {
     return AlertDialog(
       title: const Row(
         children: [
-          Icon(CupertinoIcons.app_badge, size: 20),
+          Icon(Iconsax.mobile, size: 20),
           SizedBox(width: 8),
           Text('Select Project App'),
         ],
@@ -1007,11 +950,9 @@ class _PackagePickerDialogState extends State<_PackagePickerDialog> {
                   child: TextField(
                     controller: _customController,
                     style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       isDense: true,
                       hintText: 'Enter package (e.g. com.example.app)',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     ),
                     onSubmitted: (val) {
                       if (val.trim().isNotEmpty) widget.onSelect(val.trim());
@@ -1032,10 +973,9 @@ class _PackagePickerDialogState extends State<_PackagePickerDialog> {
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size.fromHeight(36),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
               onPressed: widget.onAutoDetect,
-              icon: const Icon(CupertinoIcons.viewfinder, size: 15),
+              icon: const Icon(Iconsax.scan, size: 15),
               label: const Text('Detect Currently Active Phone App'),
             ),
             const SizedBox(height: 12),
@@ -1046,12 +986,10 @@ class _PackagePickerDialogState extends State<_PackagePickerDialog> {
             const SizedBox(height: 6),
             TextField(
               style: const TextStyle(fontSize: 11),
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 isDense: true,
                 hintText: 'Filter installed apps...',
-                prefixIcon: const Icon(CupertinoIcons.search, size: 14),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                prefixIcon: Icon(Icons.search, size: 14),
               ),
               onChanged: (val) => setState(() => _filter = val),
             ),
@@ -1063,7 +1001,7 @@ class _PackagePickerDialogState extends State<_PackagePickerDialog> {
                         widget.installedPackages.isEmpty
                             ? 'No 3rd-party apps found. Enter package manually above.'
                             : 'No apps matching "$_filter"',
-                        style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                        style: theme.textTheme.bodySmall,
                       ),
                     )
                   : ListView.builder(

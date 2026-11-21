@@ -1,8 +1,8 @@
 import 'dart:io';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:iconsax_flutter/iconsax_flutter.dart';
 
 import '../../models/emulator.dart';
 import '../../providers/app_providers.dart';
@@ -25,11 +25,21 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   final _searchController = TextEditingController();
+  final _searchQuery = ValueNotifier<String>('');
   EmulatorFilter _filter = EmulatorFilter.all;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      _searchQuery.value = _searchController.text;
+    });
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _searchQuery.dispose();
     super.dispose();
   }
 
@@ -61,7 +71,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           onRetry: () => ref.read(emulatorControllerProvider.notifier).refresh(),
         ),
         data: (data) {
-          final emulators = _applyFilters(data.emulators);
           final hasSdk = data.sdk != null;
 
           return RefreshIndicator(
@@ -97,42 +106,53 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 28),
-                sliver: SliverGrid.count(
-                  crossAxisCount: 5,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 2.3,
-                  children: <Widget>[
-                    StatTile(
-                      label: 'Installed AVDs',
-                      value: data.statistics.installed.toString(),
-                      icon: CupertinoIcons.layers_alt,
-                    ),
-                    StatTile(
-                      label: 'Physical Devices',
-                      value: data.statistics.physical.toString(),
-                      icon: CupertinoIcons.device_phone_portrait,
-                    ),
-                    StatTile(
-                      label: 'Running',
-                      value: data.statistics.running.toString(),
-                      icon: CupertinoIcons.play_circle_fill,
-                    ),
-                    StatTile(
-                      label: 'Favorites',
-                      value: data.statistics.favorites.toString(),
-                      icon: CupertinoIcons.star_fill,
-                    ),
-                    StatTile(
-                      label: 'Booting',
-                      value: (data.statistics.booting + data.booting.length).toString(),
-                      icon: CupertinoIcons.arrow_2_circlepath,
-                    ),
-                  ],
+                sliver: SliverToBoxAdapter(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final width = constraints.maxWidth;
+                      final crossAxisCount = width > 800 ? 5 : width > 500 ? 3 : 2;
+                      final aspectRatio = width > 800 ? 2.3 : 2.5;
+
+                      return GridView.count(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisCount: crossAxisCount,
+                        mainAxisSpacing: 10,
+                        crossAxisSpacing: 10,
+                        childAspectRatio: aspectRatio,
+                        children: <Widget>[
+                          StatTile(
+                            label: 'Installed AVDs',
+                            value: data.statistics.installed.toString(),
+                            icon: Iconsax.layer,
+                          ),
+                          StatTile(
+                            label: 'Physical Devices',
+                            value: data.statistics.physical.toString(),
+                            icon: Iconsax.mobile,
+                          ),
+                          StatTile(
+                            label: 'Running',
+                            value: data.statistics.running.toString(),
+                            icon: Iconsax.play_circle,
+                          ),
+                          StatTile(
+                            label: 'Favorites',
+                            value: data.statistics.favorites.toString(),
+                            icon: Iconsax.star_1,
+                          ),
+                          StatTile(
+                            label: 'Booting',
+                            value: (data.statistics.booting + data.booting.length).toString(),
+                            icon: Iconsax.refresh_circle,
+                          ),
+                        ],
+                      );
+                    },
+                  ),
                 ),
               ),
 
-              // Setup hero card if no SDK is configured
               if (!hasSdk)
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(28, 20, 28, 12),
@@ -149,74 +169,83 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   child: _Toolbar(
                     searchController: _searchController,
                     filter: _filter,
-                    onChanged: () => setState(() {}),
                     onFilterChanged: (filter) => setState(() => _filter = filter),
                     onCreateDevice: hasSdk ? () => CreateAvdDialog.show(context) : null,
                   ),
                 ),
               ),
 
-              if (hasSdk && emulators.isEmpty)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: _EmptyState(
-                    message: data.message ?? 'No virtual devices found.',
-                    actionLabel: '+ Create Virtual Device',
-                    onAction: () => CreateAvdDialog.show(context),
-                  ),
-                )
-              else if (emulators.isNotEmpty)
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(28, 8, 28, 28),
-                  sliver: SliverList.separated(
-                    itemCount: emulators.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final emulator = emulators[index];
-                      return EmulatorCard(
-                        emulator: emulator,
-                        isLaunching: data.launching.contains(emulator.name),
-                        assignedPort: data.assignedPorts[emulator.name],
-                        onFavorite: () => ref
-                            .read(settingsControllerProvider.notifier)
-                            .toggleFavorite(emulator.name),
-                        onLaunch: () => ref.read(emulatorControllerProvider.notifier).launch(emulator),
-                        onColdBoot: () => ref.read(emulatorControllerProvider.notifier).launch(emulator, coldBoot: true),
-                        onStop: () => ref.read(emulatorControllerProvider.notifier).stop(emulator),
-                        onMirror: () => _handleMirror(context, emulator),
-                        onViewLogs: () {
-                          ref.read(selectedNavIndexProvider.notifier).selectTab(3);
-                          ref.read(deviceLogsControllerProvider.notifier).selectTarget(
-                            emulator.serial ?? emulator.name,
-                          );
-                        },
-                        onSwitchToWifi: () async {
-                          final res = await ref.read(emulatorControllerProvider.notifier).switchDeviceToWifi(emulator);
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(res.message ?? (res.success ? 'Connected wirelessly!' : 'Failed to switch to Wi-Fi')),
-                                backgroundColor: res.success ? Colors.teal : Colors.red,
-                                behavior: SnackBarBehavior.floating,
-                              ),
+              ValueListenableBuilder<String>(
+                valueListenable: _searchQuery,
+                builder: (context, query, _) {
+                  final emulators = _applyFilters(data.emulators, query);
+
+                  if (hasSdk && emulators.isEmpty) {
+                    return SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: _EmptyState(
+                        message: data.message ?? 'No virtual devices found.',
+                        actionLabel: '+ Create Virtual Device',
+                        onAction: () => CreateAvdDialog.show(context),
+                      ),
+                    );
+                  }
+
+                  if (emulators.isEmpty) {
+                    return const SliverToBoxAdapter(child: SizedBox.shrink());
+                  }
+
+                  return SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(28, 8, 28, 28),
+                    sliver: SliverList.separated(
+                      itemCount: emulators.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final emulator = emulators[index];
+                        return EmulatorCard(
+                          emulator: emulator,
+                          isLaunching: data.launching.contains(emulator.name),
+                          assignedPort: data.assignedPorts[emulator.name],
+                          onFavorite: () => ref
+                              .read(settingsControllerProvider.notifier)
+                              .toggleFavorite(emulator.name),
+                          onLaunch: () => ref.read(emulatorControllerProvider.notifier).launch(emulator),
+                          onColdBoot: () => ref.read(emulatorControllerProvider.notifier).launch(emulator, coldBoot: true),
+                          onStop: () => ref.read(emulatorControllerProvider.notifier).stop(emulator),
+                          onMirror: () => _handleMirror(context, emulator),
+                          onViewLogs: () {
+                            ref.read(selectedNavIndexProvider.notifier).selectTab(3);
+                            ref.read(deviceLogsControllerProvider.notifier).selectTarget(
+                              emulator.serial ?? emulator.name,
                             );
-                          }
-                        },
-                        onDisconnectWifi: () async {
-                          final res = await ref.read(emulatorControllerProvider.notifier).disconnectWireless(emulator);
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(res ? 'Wireless device disconnected' : 'Failed to disconnect'),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          }
-                        },
-                      );
-                    },
-                  ),
-                ),
+                          },
+                          onSwitchToWifi: () async {
+                            final res = await ref.read(emulatorControllerProvider.notifier).switchDeviceToWifi(emulator);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(res.message ?? (res.success ? 'Connected wirelessly!' : 'Failed to switch to Wi-Fi')),
+                                  backgroundColor: res.success ? Colors.teal : Colors.red,
+                                ),
+                              );
+                            }
+                          },
+                          onDisconnectWifi: () async {
+                            final res = await ref.read(emulatorControllerProvider.notifier).disconnectWireless(emulator);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(res ? 'Wireless device disconnected' : 'Failed to disconnect'),
+                                ),
+                              );
+                            }
+                          },
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
             ],
           ),
         );
@@ -231,11 +260,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       final shouldInstall = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Row(
+          title: Row(
             children: [
-              Icon(CupertinoIcons.tv, size: 22),
-              SizedBox(width: 10),
-              Text('scrcpy Required'),
+              Icon(Iconsax.monitor, size: 22, color: Theme.of(ctx).colorScheme.primary),
+              const SizedBox(width: 10),
+              const Text('scrcpy Required'),
             ],
           ),
           content: Text(
@@ -251,7 +280,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             if (Platform.isWindows)
               FilledButton.icon(
                 onPressed: () => Navigator.of(ctx).pop(true),
-                icon: const Icon(CupertinoIcons.cloud_download, size: 16),
+                icon: const Icon(Icons.download, size: 16),
                 label: const Text('Install Automatically'),
               ),
           ],
@@ -272,8 +301,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     ref.read(emulatorControllerProvider.notifier).mirrorWithScrcpy(emulator);
   }
 
-  List<Emulator> _applyFilters(List<Emulator> emulators) {
-    final query = _searchController.text.trim().toLowerCase();
+  List<Emulator> _applyFilters(List<Emulator> emulators, String queryText) {
+    final query = queryText.trim().toLowerCase();
     return emulators.where((emulator) {
       final matchesQuery = query.isEmpty ||
           emulator.name.toLowerCase().contains(query) ||
@@ -299,29 +328,32 @@ class _StandaloneSetupHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.6),
-            Theme.of(context).colorScheme.surfaceContainerHighest,
+            colorScheme.primaryContainer.withValues(alpha: 0.6),
+            colorScheme.surfaceContainerHigh,
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary,
+              color: colorScheme.primary,
               shape: BoxShape.circle,
             ),
-            child: const Icon(CupertinoIcons.rocket_fill, color: Colors.white, size: 32),
+            child: const Icon(Icons.rocket_launch, color: Colors.white, size: 32),
           ),
           const SizedBox(width: 20),
           Expanded(
@@ -330,14 +362,12 @@ class _StandaloneSetupHeroCard extends StatelessWidget {
               children: [
                 Text(
                   'No Android Studio Needed! Standalone Environment',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Android Studio is just a GUI around command-line tools. This manager automatically installs portable OpenJDK 17, Google cmdline-tools, emulator, and Google APIs images.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                  style: textTheme.bodySmall,
                 ),
               ],
             ),
@@ -345,11 +375,8 @@ class _StandaloneSetupHeroCard extends StatelessWidget {
           const SizedBox(width: 16),
           FilledButton.icon(
             onPressed: onSetup,
-            icon: const Icon(CupertinoIcons.arrow_down_to_line),
+            icon: const Icon(Icons.download, size: 18),
             label: const Text('Setup Environment Now'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-            ),
           ),
         ],
       ),
@@ -376,6 +403,8 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: <Widget>[
@@ -383,12 +412,12 @@ class _Header extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text('Android Emulator Manager', style: Theme.of(context).textTheme.headlineSmall),
+              Text('Simulation Tray', style: textTheme.headlineSmall),
               const SizedBox(height: 6),
               Row(
                 children: [
                   Icon(
-                    hasSdk ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.exclamationmark_triangle_fill,
+                    hasSdk ? Icons.check_circle : Icons.warning_amber_rounded,
                     size: 16,
                     color: hasSdk ? Colors.green : Colors.amber,
                   ),
@@ -397,9 +426,7 @@ class _Header extends StatelessWidget {
                     child: Text(
                       sdkPath == null ? 'Android SDK not configured (Standalone mode available)' : sdkPath!,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
+                      style: textTheme.bodySmall,
                     ),
                   ),
                 ],
@@ -410,42 +437,32 @@ class _Header extends StatelessWidget {
         if (hasSdk) ...[
           FilledButton.icon(
             onPressed: onCreateAvd,
-            icon: const Icon(CupertinoIcons.add, size: 18),
+            icon: const Icon(Icons.add, size: 18),
             label: const Text('Create Device'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            ),
           ),
           const SizedBox(width: 10),
           OutlinedButton.icon(
             onPressed: onConnectWireless,
-            icon: const Icon(CupertinoIcons.wifi, size: 18),
+            icon: const Icon(Icons.wifi, size: 18),
             label: const Text('Connect Wi-Fi'),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.teal,
               side: BorderSide(color: Colors.teal.withValues(alpha: 0.5)),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             ),
           ),
           const SizedBox(width: 10),
         ] else ...[
           FilledButton.icon(
             onPressed: onSetupSdk,
-            icon: const Icon(CupertinoIcons.wrench_fill, size: 18),
+            icon: const Icon(Icons.build, size: 18),
             label: const Text('Setup SDK'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            ),
           ),
           const SizedBox(width: 10),
         ],
         FilledButton.tonalIcon(
           onPressed: onRefresh,
-          icon: const Icon(CupertinoIcons.refresh, size: 18),
+          icon: const Icon(Icons.refresh, size: 18),
           label: const Text('Refresh'),
-          style: FilledButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-          ),
         ),
       ],
     );
@@ -456,43 +473,42 @@ class _Toolbar extends StatelessWidget {
   const _Toolbar({
     required this.searchController,
     required this.filter,
-    required this.onChanged,
     required this.onFilterChanged,
     this.onCreateDevice,
   });
 
   final TextEditingController searchController;
   final EmulatorFilter filter;
-  final VoidCallback onChanged;
   final ValueChanged<EmulatorFilter> onFilterChanged;
   final VoidCallback? onCreateDevice;
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Row(
       children: <Widget>[
         Expanded(
           child: TextField(
             controller: searchController,
-            onChanged: (_) => onChanged(),
             decoration: InputDecoration(
               isDense: true,
-              prefixIcon: const Icon(CupertinoIcons.search, size: 20),
+              prefixIcon: const Icon(Icons.search, size: 20),
               hintText: 'Search by name, API, Android version, or architecture',
               filled: true,
-              fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+              fillColor: colorScheme.surfaceContainerLow,
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(28),
-                borderSide: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: colorScheme.outlineVariant, width: 0.5),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(28),
-                borderSide: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: colorScheme.outlineVariant, width: 0.5),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(28),
-                borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.5),
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
               ),
             ),
           ),
@@ -527,20 +543,22 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(CupertinoIcons.device_phone_portrait, size: 56, color: Theme.of(context).colorScheme.outline),
+            Icon(Iconsax.mobile, size: 56, color: Theme.of(context).colorScheme.outline),
             const SizedBox(height: 16),
-            Text(message, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium),
+            Text(message, textAlign: TextAlign.center, style: textTheme.titleMedium),
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: 16),
               FilledButton.icon(
                 onPressed: onAction,
-                icon: const Icon(CupertinoIcons.add),
+                icon: const Icon(Icons.add),
                 label: Text(actionLabel!),
               ),
             ],
@@ -565,11 +583,11 @@ class _ErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            const Icon(CupertinoIcons.exclamationmark_circle, size: 56),
+            const Icon(Icons.error_outline, size: 56),
             const SizedBox(height: 12),
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 16),
-            FilledButton.icon(onPressed: onRetry, icon: const Icon(CupertinoIcons.refresh), label: const Text('Retry')),
+            FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh), label: const Text('Retry')),
           ],
         ),
       ),
@@ -611,14 +629,14 @@ class _DashboardSkeletonState extends State<_DashboardSkeleton> with SingleTicke
     return AnimatedBuilder(
       animation: _pulseAnimation,
       builder: (context, child) {
-        final theme = Theme.of(context);
+        final colorScheme = Theme.of(context).colorScheme;
         return Opacity(
           opacity: _pulseAnimation.value,
           child: Container(
             width: width,
             height: height,
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+              color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.55),
               borderRadius: BorderRadius.circular(radius),
             ),
           ),
@@ -630,6 +648,7 @@ class _DashboardSkeletonState extends State<_DashboardSkeleton> with SingleTicke
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return SingleChildScrollView(
       physics: const NeverScrollableScrollPhysics(),
@@ -637,7 +656,6 @@ class _DashboardSkeletonState extends State<_DashboardSkeleton> with SingleTicke
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Skeleton
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -645,29 +663,29 @@ class _DashboardSkeletonState extends State<_DashboardSkeleton> with SingleTicke
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Android Emulator Manager', style: theme.textTheme.headlineSmall),
+                    Text('Simulation Tray', style: theme.textTheme.headlineSmall),
                     const SizedBox(height: 8),
                     _box(width: 260, height: 14, radius: 4),
                   ],
                 ),
               ),
-              _box(width: 140, height: 42, radius: 21),
+              _box(width: 140, height: 42, radius: 10),
               const SizedBox(width: 10),
-              _box(width: 100, height: 42, radius: 21),
+              _box(width: 100, height: 42, radius: 10),
             ],
           ),
           const SizedBox(height: 24),
 
-          // 4 Stat Tiles Skeleton
           Row(
             children: List.generate(4, (index) {
               return Expanded(
                 child: Container(
-                  margin: EdgeInsets.only(right: index < 3 ? 12 : 0),
+                  margin: EdgeInsets.only(right: index < 3 ? 10 : 0),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(12),
+                    color: colorScheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: colorScheme.outlineVariant, width: 0.5),
                   ),
                   child: Row(
                     children: [
@@ -692,31 +710,29 @@ class _DashboardSkeletonState extends State<_DashboardSkeleton> with SingleTicke
           ),
           const SizedBox(height: 24),
 
-          // Search Bar & Filter Skeleton
           Row(
             children: [
               Expanded(
-                child: _box(width: double.infinity, height: 46, radius: 28),
+                child: _box(width: double.infinity, height: 46, radius: 10),
               ),
               const SizedBox(width: 12),
-              _box(width: 220, height: 40, radius: 20),
+              _box(width: 220, height: 40, radius: 10),
             ],
           ),
           const SizedBox(height: 20),
 
-          // 2 Emulator Card Skeletons
           ...List.generate(2, (index) {
             return Container(
-              margin: const EdgeInsets.only(bottom: 12),
+              margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: theme.dividerColor.withValues(alpha: 0.4)),
+                color: colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: colorScheme.outlineVariant, width: 0.5),
               ),
               child: Row(
                 children: [
-                  _box(width: 44, height: 44, radius: 12),
+                  _box(width: 44, height: 44, radius: 10),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
@@ -726,17 +742,17 @@ class _DashboardSkeletonState extends State<_DashboardSkeleton> with SingleTicke
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            _box(width: 64, height: 16, radius: 8),
+                            _box(width: 64, height: 16, radius: 6),
                             const SizedBox(width: 6),
-                            _box(width: 72, height: 16, radius: 8),
+                            _box(width: 72, height: 16, radius: 6),
                             const SizedBox(width: 6),
-                            _box(width: 58, height: 16, radius: 8),
+                            _box(width: 58, height: 16, radius: 6),
                           ],
                         ),
                       ],
                     ),
                   ),
-                  _box(width: 100, height: 38, radius: 19),
+                  _box(width: 100, height: 38, radius: 10),
                 ],
               ),
             );

@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -187,7 +187,7 @@ class _WirelessConnectDialogState extends ConsumerState<WirelessConnectDialog> w
                       color: Colors.teal.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(CupertinoIcons.wifi, color: Colors.teal, size: 20),
+                    child: const Icon(Icons.wifi_rounded, color: Colors.teal, size: 20),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -200,7 +200,7 @@ class _WirelessConnectDialogState extends ConsumerState<WirelessConnectDialog> w
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(CupertinoIcons.xmark, size: 16),
+                    icon: const Icon(Icons.close_rounded, size: 16),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
@@ -214,8 +214,8 @@ class _WirelessConnectDialogState extends ConsumerState<WirelessConnectDialog> w
                 indicatorSize: TabBarIndicatorSize.tab,
                 dividerColor: Colors.transparent,
                 tabs: const [
-                  Tab(icon: Icon(CupertinoIcons.bolt_fill, size: 14), text: '1-Click / IP Connect'),
-                  Tab(icon: Icon(CupertinoIcons.qrcode, size: 14), text: 'Android 11+ Pairing'),
+                  Tab(icon: Icon(Icons.flash_on_rounded, size: 14), text: '1-Click / IP Connect'),
+                  Tab(icon: Icon(Icons.qr_code_rounded, size: 14), text: 'Android 11+ Pairing'),
                 ],
               ),
 
@@ -247,7 +247,7 @@ class _WirelessConnectDialogState extends ConsumerState<WirelessConnectDialog> w
                                   ),
                                   child: Row(
                                     children: [
-                                      const Icon(CupertinoIcons.device_phone_portrait, size: 18),
+                                      const Icon(Iconsax.mobile, size: 18),
                                       const SizedBox(width: 10),
                                       Expanded(
                                         child: Column(
@@ -265,7 +265,7 @@ class _WirelessConnectDialogState extends ConsumerState<WirelessConnectDialog> w
                                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                         ),
                                         onPressed: _isLoading ? null : () => _handleSwitchUsbToWifi(dev),
-                                        icon: const Icon(CupertinoIcons.wifi, size: 14),
+                                        icon: const Icon(Icons.wifi_rounded, size: 14),
                                         label: const Text('Switch to Wi-Fi', style: TextStyle(fontSize: 12)),
                                       ),
                                     ],
@@ -290,7 +290,7 @@ class _WirelessConnectDialogState extends ConsumerState<WirelessConnectDialog> w
                                     isDense: true,
                                     labelText: 'Phone IP Address',
                                     hintText: '192.168.1.100',
-                                    prefixIcon: const Icon(CupertinoIcons.wifi, size: 16),
+                                    prefixIcon: const Icon(Icons.wifi_rounded, size: 16),
                                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                                     contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                                   ),
@@ -318,7 +318,7 @@ class _WirelessConnectDialogState extends ConsumerState<WirelessConnectDialog> w
                             alignment: Alignment.centerRight,
                             child: FilledButton.icon(
                               onPressed: _isLoading ? null : _handleDirectConnect,
-                              icon: const Icon(CupertinoIcons.link, size: 14),
+                              icon: const Icon(Icons.link_rounded, size: 14),
                               label: const Text('Connect Wireless'),
                             ),
                           ),
@@ -340,7 +340,7 @@ class _WirelessConnectDialogState extends ConsumerState<WirelessConnectDialog> w
                             ),
                             child: const Row(
                               children: [
-                                Icon(CupertinoIcons.info_circle_fill, color: Colors.blue, size: 16),
+                                Icon(Icons.info_rounded, color: Colors.blue, size: 16),
                                 SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
@@ -404,7 +404,7 @@ class _WirelessConnectDialogState extends ConsumerState<WirelessConnectDialog> w
                             alignment: Alignment.centerRight,
                             child: FilledButton.icon(
                               onPressed: _isLoading ? null : _handlePairAndConnect,
-                              icon: const Icon(CupertinoIcons.checkmark_shield_fill, size: 14),
+                              icon: const Icon(Icons.verified_user_rounded, size: 14),
                               label: const Text('Pair & Connect'),
                             ),
                           ),
@@ -441,7 +441,7 @@ class _WirelessConnectDialogState extends ConsumerState<WirelessConnectDialog> w
                         )
                       else
                         Icon(
-                          _isSuccess ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.exclamationmark_circle_fill,
+                          _isSuccess ? Icons.check_circle_rounded : Icons.error_rounded,
                           color: _isSuccess ? Colors.green : Colors.red,
                           size: 16,
                         ),

@@ -53,14 +53,14 @@ class AemApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final settings = ref.watch(settingsControllerProvider);
+    final themeMode = ref.watch(settingsControllerProvider.select((s) => s.themeMode));
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: AppConstants.appName,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
-      themeMode: settings.themeMode,
+      themeMode: themeMode,
       home: const HomeShell(),
     );
   }

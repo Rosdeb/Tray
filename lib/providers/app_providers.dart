@@ -274,13 +274,16 @@ final emulatorControllerProvider =
 class EmulatorController extends AsyncNotifier<EmulatorState> {
   Timer? _timer;
 
+  HardwareAccelerationInfo? _cachedAccelInfo;
+
   @override
   Future<EmulatorState> build() async {
     ref.onDispose(() => _timer?.cancel());
-    final settings = ref.watch(settingsControllerProvider);
+    final refreshInterval = ref.watch(settingsControllerProvider.select((s) => s.refreshIntervalSeconds));
+    final settings = ref.read(settingsControllerProvider);
     _timer?.cancel();
     _timer = Timer.periodic(
-      Duration(seconds: settings.refreshIntervalSeconds),
+      Duration(seconds: refreshInterval),
       (_) => refreshSilently(),
     );
     return _load(settings);
@@ -311,7 +314,7 @@ class EmulatorController extends AsyncNotifier<EmulatorState> {
       return e;
     }).toList(growable: false);
 
-    final accelInfo = await repository.checkHardwareAcceleration(sdk);
+    _cachedAccelInfo ??= await repository.checkHardwareAcceleration(sdk);
 
     final message = updatedEmulators.isEmpty
         ? 'No Android Virtual Devices found. Click "+ Create Device" to create your first virtual device!'
@@ -322,11 +325,16 @@ class EmulatorController extends AsyncNotifier<EmulatorState> {
       emulators: updatedEmulators,
       message: message,
       booting: currentBooting,
-      hardwareAccelInfo: accelInfo,
+      hardwareAccelInfo: _cachedAccelInfo,
     );
   }
 
+  void invalidateAccelCache() {
+    _cachedAccelInfo = null;
+  }
+
   Future<void> refresh() async {
+    _cachedAccelInfo = null;
     state = const AsyncLoading<EmulatorState>();
     state = await AsyncValue.guard(
       () => _load(ref.read(settingsControllerProvider)),
@@ -859,6 +867,13 @@ class DeviceMonitorController extends Notifier<DeviceMonitorState> {
     state = state.copyWith(isPaused: !state.isPaused);
   }
 
+  static List<MetricDataPoint> _appendCapped(List<MetricDataPoint> list, MetricDataPoint item, int max) {
+    if (list.length >= max) {
+      return [...list.sublist(1), item];
+    }
+    return [...list, item];
+  }
+
   Future<void> tick() async {
     if (_isPolling || state.isPaused) return;
     _isPolling = true;
@@ -876,17 +891,10 @@ class DeviceMonitorController extends Notifier<DeviceMonitorState> {
       final now = metrics.timestamp;
       const maxHistory = 30;
 
-      final newCpu = [...state.cpuHistory, MetricDataPoint(timestamp: now, value: metrics.cpuPercent)];
-      if (newCpu.length > maxHistory) newCpu.removeAt(0);
-
-      final newRam = [...state.ramHistory, MetricDataPoint(timestamp: now, value: metrics.ramUsagePercent)];
-      if (newRam.length > maxHistory) newRam.removeAt(0);
-
-      final newRx = [...state.rxHistory, MetricDataPoint(timestamp: now, value: metrics.networkRxSpeedKbps)];
-      if (newRx.length > maxHistory) newRx.removeAt(0);
-
-      final newTx = [...state.txHistory, MetricDataPoint(timestamp: now, value: metrics.networkTxSpeedKbps)];
-      if (newTx.length > maxHistory) newTx.removeAt(0);
+      final newCpu = _appendCapped(state.cpuHistory, MetricDataPoint(timestamp: now, value: metrics.cpuPercent), maxHistory);
+      final newRam = _appendCapped(state.ramHistory, MetricDataPoint(timestamp: now, value: metrics.ramUsagePercent), maxHistory);
+      final newRx = _appendCapped(state.rxHistory, MetricDataPoint(timestamp: now, value: metrics.networkRxSpeedKbps), maxHistory);
+      final newTx = _appendCapped(state.txHistory, MetricDataPoint(timestamp: now, value: metrics.networkTxSpeedKbps), maxHistory);
 
       state = state.copyWith(
         currentMetrics: metrics,

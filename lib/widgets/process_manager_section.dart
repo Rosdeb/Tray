@@ -1,9 +1,17 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:iconsax_flutter/iconsax_flutter.dart';
 
 import '../models/system_process.dart';
 import '../providers/app_providers.dart';
+
+IconData _categoryIcon(ProcessCategory cat) => switch (cat) {
+  ProcessCategory.emulator => Iconsax.mobile,
+  ProcessCategory.adb => Iconsax.link_1,
+  ProcessCategory.javaGradle => Iconsax.layer,
+  ProcessCategory.scrcpy => Iconsax.monitor,
+  ProcessCategory.other => Iconsax.cpu,
+};
 
 class ProcessManagerSection extends ConsumerStatefulWidget {
   const ProcessManagerSection({super.key});
@@ -33,9 +41,9 @@ class _ProcessManagerSectionState extends ConsumerState<ProcessManagerSection> {
 
     return Container(
       decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.6)),
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: colorScheme.outlineVariant, width: 0.5),
       ),
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -50,7 +58,7 @@ class _ProcessManagerSectionState extends ConsumerState<ProcessManagerSection> {
                   color: colorScheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(CupertinoIcons.square_stack_3d_up_fill, color: colorScheme.primary, size: 22),
+                child: Icon(Iconsax.cpu, color: colorScheme.primary, size: 22),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -75,7 +83,7 @@ class _ProcessManagerSectionState extends ConsumerState<ProcessManagerSection> {
                     foregroundColor: Colors.red.shade700,
                   ),
                   onPressed: () => _confirmKillSelected(state.selectedPids.length),
-                  icon: const Icon(CupertinoIcons.trash, size: 18),
+                  icon: const Icon(Icons.delete_outline, size: 18),
                   label: Text('Kill Selected (${state.selectedPids.length})'),
                 ),
                 const SizedBox(width: 8),
@@ -89,7 +97,7 @@ class _ProcessManagerSectionState extends ConsumerState<ProcessManagerSection> {
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(CupertinoIcons.refresh, size: 18),
+                    : const Icon(Icons.refresh, size: 18),
               ),
             ],
           ),
@@ -106,13 +114,13 @@ class _ProcessManagerSectionState extends ConsumerState<ProcessManagerSection> {
             child: Row(
               children: <Widget>[
                 _StatBadge(
-                  icon: CupertinoIcons.square_grid_2x2,
+                  icon: Iconsax.grid_2,
                   label: 'Detected Processes',
                   value: totalProcesses.toString(),
                 ),
                 const SizedBox(width: 20),
                 _StatBadge(
-                  icon: CupertinoIcons.chart_pie,
+                  icon: Iconsax.chart,
                   label: 'Total RAM',
                   value: state.formattedTotalMemory,
                 ),
@@ -125,8 +133,8 @@ class _ProcessManagerSectionState extends ConsumerState<ProcessManagerSection> {
                         : () => controller.selectAll(),
                     icon: Icon(
                       state.selectedPids.length == state.filteredProcesses.length && state.filteredProcesses.isNotEmpty
-                          ? CupertinoIcons.clear
-                          : CupertinoIcons.checkmark_rectangle,
+                          ? Icons.clear
+                          : Icons.check_box_outlined,
                       size: 16,
                     ),
                     label: Text(
@@ -153,10 +161,10 @@ class _ProcessManagerSectionState extends ConsumerState<ProcessManagerSection> {
                     decoration: InputDecoration(
                       hintText: 'Search by process name, PID, or args...',
                       hintStyle: const TextStyle(fontSize: 12),
-                      prefixIcon: const Icon(CupertinoIcons.search, size: 18),
+                      prefixIcon: const Icon(Icons.search, size: 18),
                       suffixIcon: _searchController.text.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(CupertinoIcons.clear, size: 16),
+                              icon: const Icon(Icons.clear, size: 16),
                               onPressed: () {
                                 _searchController.clear();
                                 controller.setSearchQuery('');
@@ -195,7 +203,7 @@ class _ProcessManagerSectionState extends ConsumerState<ProcessManagerSection> {
                   return Padding(
                     padding: const EdgeInsets.only(right: 6),
                     child: FilterChip(
-                      avatar: Icon(cat.icon, size: 14),
+                      avatar: Icon(_categoryIcon(cat), size: 14),
                       label: Text('${cat.label} ($count)', style: const TextStyle(fontSize: 11)),
                       selected: isSelected,
                       onSelected: (_) => controller.setFilterCategory(isSelected ? null : cat),
@@ -224,7 +232,7 @@ class _ProcessManagerSectionState extends ConsumerState<ProcessManagerSection> {
               alignment: Alignment.center,
               child: Column(
                 children: <Widget>[
-                  Icon(CupertinoIcons.checkmark_circle, size: 40, color: Colors.green.withValues(alpha: 0.6)),
+                  Icon(Icons.check_circle_outline, size: 40, color: Colors.green.withValues(alpha: 0.6)),
                   const SizedBox(height: 10),
                   Text(
                     state.searchQuery.isNotEmpty || state.filterCategory != null
@@ -254,13 +262,13 @@ class _ProcessManagerSectionState extends ConsumerState<ProcessManagerSection> {
 
                 return Container(
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: theme.dividerColor.withValues(alpha: 0.5)),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: colorScheme.outlineVariant, width: 0.5),
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: ExpansionTile(
                     initiallyExpanded: true,
-                    leading: Icon(category.icon, color: colorScheme.primary),
+                    leading: Icon(_categoryIcon(category), color: colorScheme.primary),
                     title: Row(
                       children: <Widget>[
                         Flexible(
@@ -301,7 +309,7 @@ class _ProcessManagerSectionState extends ConsumerState<ProcessManagerSection> {
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       ),
                       onPressed: () => _confirmKillGroup(category, items.length),
-                      icon: const Icon(CupertinoIcons.stop_circle, size: 14),
+                      icon: const Icon(Icons.stop_circle_outlined, size: 14),
                       label: const Text('Kill Group', style: TextStyle(fontSize: 11)),
                     ),
                     children: items.map((process) {
@@ -309,7 +317,7 @@ class _ProcessManagerSectionState extends ConsumerState<ProcessManagerSection> {
                       return Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          border: Border(top: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3))),
+                          border: Border(top: BorderSide(color: colorScheme.outlineVariant)),
                           color: isSelected ? colorScheme.primary.withValues(alpha: 0.05) : null,
                         ),
                         child: Row(
@@ -387,7 +395,7 @@ class _ProcessManagerSectionState extends ConsumerState<ProcessManagerSection> {
                             IconButton(
                               tooltip: 'Kill process #${process.pid}',
                               visualDensity: VisualDensity.compact,
-                              icon: const Icon(CupertinoIcons.xmark, size: 16, color: Colors.red),
+                              icon: const Icon(Icons.close, size: 16, color: Colors.red),
                               onPressed: () => _confirmKillProcess(process),
                             ),
                           ],

@@ -1,40 +1,31 @@
-import 'package:flutter/cupertino.dart';
-
 enum ProcessCategory {
   emulator(
     label: 'Android Emulators (QEMU)',
-    icon: CupertinoIcons.device_phone_portrait,
     description: 'Running Android Virtual Devices and QEMU hypervisor engines',
   ),
   adb(
     label: 'ADB Bridges & Daemons',
-    icon: CupertinoIcons.link,
     description: 'Android Debug Bridge server and connected device relays',
   ),
   javaGradle(
     label: 'Java & Gradle Daemons',
-    icon: CupertinoIcons.layers_alt_fill,
     description: 'Background build servers, JDK runtimes, and Gradle workers',
   ),
   scrcpy(
     label: 'Screen Mirroring (scrcpy)',
-    icon: CupertinoIcons.tv,
     description: 'Active USB/TCP screen mirroring sessions',
   ),
   other(
     label: 'Other Android SDK Tools',
-    icon: CupertinoIcons.square_stack_3d_up_fill,
     description: 'SDK manager, AVD manager, or platform utility background tasks',
   );
 
   const ProcessCategory({
     required this.label,
-    required this.icon,
     required this.description,
   });
 
   final String label;
-  final IconData icon;
   final String description;
 }
 

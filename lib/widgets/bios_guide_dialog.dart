@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter/cupertino.dart';
+import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -121,7 +121,7 @@ class _BiosGuideDialogState extends ConsumerState<BiosGuideDialog> with SingleTi
       builder: (ctx) => AlertDialog(
         title: const Row(
           children: [
-            Icon(CupertinoIcons.exclamationmark_triangle_fill, color: Colors.amber),
+            Icon(Icons.warning_amber_rounded, color: Colors.amber),
             SizedBox(width: 10),
             Text('Reboot to UEFI / BIOS?'),
           ],
@@ -181,7 +181,7 @@ class _BiosGuideDialogState extends ConsumerState<BiosGuideDialog> with SingleTi
                       color: colorScheme.primaryContainer,
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(CupertinoIcons.speedometer, color: colorScheme.primary, size: 24),
+                    child: Icon(Iconsax.cpu, color: colorScheme.primary, size: 24),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -201,7 +201,7 @@ class _BiosGuideDialogState extends ConsumerState<BiosGuideDialog> with SingleTi
                   ),
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(CupertinoIcons.xmark, size: 20),
+                    icon: const Icon(Icons.close_rounded, size: 20),
                     tooltip: 'Close',
                   ),
                 ],
@@ -220,8 +220,8 @@ class _BiosGuideDialogState extends ConsumerState<BiosGuideDialog> with SingleTi
                   children: [
                     Icon(
                       biosInfo.isVirtualizationActive
-                          ? CupertinoIcons.checkmark_seal_fill
-                          : CupertinoIcons.exclamationmark_triangle_fill,
+                          ? Icons.verified_rounded
+                          : Icons.warning_amber_rounded,
                       color: biosInfo.isVirtualizationActive ? Colors.green : Colors.amber.shade800,
                       size: 20,
                     ),
@@ -282,7 +282,7 @@ class _BiosGuideDialogState extends ConsumerState<BiosGuideDialog> with SingleTi
                           ),
                           child: Row(
                             children: [
-                              const Icon(CupertinoIcons.keyboard, size: 18),
+                              const Icon(Icons.keyboard_rounded, size: 18),
                               const SizedBox(width: 10),
                               Text(
                                 'BIOS Key: ',
@@ -351,7 +351,7 @@ class _BiosGuideDialogState extends ConsumerState<BiosGuideDialog> with SingleTi
                         // Save & Notes
                         Row(
                           children: [
-                            const Icon(CupertinoIcons.floppy_disk, size: 16),
+                            const Icon(Icons.save_rounded, size: 16),
                             const SizedBox(width: 6),
                             Text(
                               'Save Key: ${brand['saveKey']}',
@@ -388,14 +388,14 @@ class _BiosGuideDialogState extends ConsumerState<BiosGuideDialog> with SingleTi
                         visualDensity: VisualDensity.compact,
                       ),
                       onPressed: _handleRebootToBios,
-                      icon: const Icon(CupertinoIcons.arrow_2_circlepath, size: 16),
+                      icon: const Icon(Icons.sync_rounded, size: 16),
                       label: const Text('Reboot into BIOS Now'),
                     ),
                   const SizedBox(width: 8),
                   OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
                     onPressed: () => SystemEnvironmentService.openMotherboardBiosSupportPage(biosInfo.motherboardManufacturer),
-                    icon: const Icon(CupertinoIcons.globe, size: 16),
+                    icon: const Icon(Icons.language_rounded, size: 16),
                     label: const Text('Vendor Support'),
                   ),
                 ],
