@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
@@ -210,13 +209,6 @@ class _HomeShellState extends ConsumerState<HomeShell>
 
     final selectedIndex = ref.watch(selectedNavIndexProvider);
 
-    final pages = [
-      const DashboardScreen(),
-      const MonitorScreen(),
-      const SettingsScreen(),
-      const LogsScreen(),
-    ];
-
     return Scaffold(
       body: Row(
         children: [
@@ -229,7 +221,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
 
           VerticalDivider(
             width: 1,
-            color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
+            color: Theme.of(context).colorScheme.outlineVariant,
           ),
 
           Expanded(
@@ -255,7 +247,15 @@ class _HomeShellState extends ConsumerState<HomeShell>
                   ),
 
                 Expanded(
-                  child: pages[selectedIndex],
+                  child: IndexedStack(
+                    index: selectedIndex,
+                    children: const [
+                      DashboardScreen(),
+                      MonitorScreen(),
+                      SettingsScreen(),
+                      LogsScreen(),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -317,14 +317,14 @@ class AppSidebar extends ConsumerWidget {
           Row(
             children: [
               const SizedBox(width: 12),
-              Image.asset("assets/icons/tray.png",height: 40,width: 50,color: colorScheme.onSurfaceVariant.withValues(alpha: 4),),
+              Image.asset("assets/icons/tray.png",height: 40,width: 50,color: colorScheme.onSurfaceVariant.withValues(alpha: 0.85),),
               const SizedBox(width: 12),
               Text(
                 "Tray",
                 style: TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.w700,
-                  color: colorScheme.onSurfaceVariant.withValues(alpha: 3),
+                  color: colorScheme.onSurface.withValues(alpha: 0.9),
                 ),
               ),
             ],
@@ -470,7 +470,7 @@ class _VersionUpdateTileState extends ConsumerState<VersionUpdateTile> {
                                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.green),
                                 )
                               : const Icon(
-                                  CupertinoIcons.checkmark_circle_fill,
+                                  Icons.check_circle_rounded,
                                   size: 14,
                                   color: Colors.green,
                                 ),
@@ -523,7 +523,7 @@ class _VersionUpdateTileState extends ConsumerState<VersionUpdateTile> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        CupertinoIcons.arrow_down_circle,
+                        Icons.download_rounded,
                         size: 14,
                         color: colorScheme.primary,
                       ),
@@ -594,7 +594,7 @@ class _SidebarTileState extends State<SidebarTile> {
             vertical: 12,
           ),
           transform: pressed
-              ? (Matrix4.identity()..scaleByDouble(.96, .96, 1.0, 1.0))
+              ? (Matrix4.identity()..scaleByDouble(0.96, 0.96, 1.0, 1.0))
               : Matrix4.identity(),
           decoration: BoxDecoration(
             color: widget.active
@@ -759,7 +759,7 @@ class _WindowCaptionButtonsState extends State<WindowCaptionButtons> with Window
             }
           },
           icon: Icon(
-            _isMaximized ? CupertinoIcons.fullscreen_exit : CupertinoIcons.square,
+            _isMaximized ? Icons.fullscreen_exit_rounded : Icons.crop_square_rounded,
             size: 14,
             color: iconColor,
           ),
@@ -767,7 +767,7 @@ class _WindowCaptionButtonsState extends State<WindowCaptionButtons> with Window
         IconButton(
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 46, minHeight: 46),
-          icon: const Icon(CupertinoIcons.xmark, size: 16),
+          icon: const Icon(Icons.close_rounded, size: 16),
           style: IconButton.styleFrom(
             hoverColor: Colors.red,
             foregroundColor: iconColor,

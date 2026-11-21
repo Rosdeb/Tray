@@ -1,6 +1,6 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:iconsax_flutter/iconsax_flutter.dart';
 
 import '../../models/device_metrics.dart';
 import '../../providers/app_providers.dart';
@@ -87,7 +87,7 @@ class _MonitorScreenState extends ConsumerState<MonitorScreen> {
                           tooltip: state.isPaused ? 'Resume monitoring' : 'Pause monitoring',
                           onPressed: () => controller.togglePause(),
                           icon: Icon(
-                            state.isPaused ? CupertinoIcons.play_fill : CupertinoIcons.pause_fill,
+                            state.isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
                             color: state.isPaused ? Colors.green : Colors.orange,
                             size: 18,
                           ),
@@ -95,7 +95,7 @@ class _MonitorScreenState extends ConsumerState<MonitorScreen> {
                         const SizedBox(width: 8),
                         FilledButton.tonalIcon(
                           onPressed: () => _showCustomizeWidgetsDialog(context, config, controller),
-                          icon: const Icon(CupertinoIcons.slider_horizontal_3, size: 16),
+                          icon: const Icon(Iconsax.setting_4, size: 16),
                           label: const Text('Customize', style: TextStyle(fontSize: 12)),
                         ),
                       ],
@@ -144,7 +144,7 @@ class _MonitorScreenState extends ConsumerState<MonitorScreen> {
                     tooltip: state.isPaused ? 'Resume monitoring' : 'Pause monitoring',
                     onPressed: () => controller.togglePause(),
                     icon: Icon(
-                      state.isPaused ? CupertinoIcons.play_fill : CupertinoIcons.pause_fill,
+                      state.isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
                       color: state.isPaused ? Colors.green : Colors.orange,
                       size: 20,
                     ),
@@ -152,10 +152,9 @@ class _MonitorScreenState extends ConsumerState<MonitorScreen> {
 
                   const SizedBox(width: 8),
 
-                  // Customize Widgets Button
                   FilledButton.tonalIcon(
                     onPressed: () => _showCustomizeWidgetsDialog(context, config, controller),
-                    icon: const Icon(CupertinoIcons.slider_horizontal_3, size: 16),
+                    icon: const Icon(Iconsax.setting_4, size: 16),
                     label: const Text('Customize Widgets', style: TextStyle(fontSize: 12)),
                   ),
                 ],
@@ -327,7 +326,7 @@ class _MonitorScreenState extends ConsumerState<MonitorScreen> {
           isDense: true,
           isExpanded: true,
           value: state.selectedTargetId,
-          icon: Icon(CupertinoIcons.chevron_down, size: 16, color: colorScheme.onSurfaceVariant),
+          icon: Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: colorScheme.onSurfaceVariant),
           focusColor: Colors.transparent,
           dropdownColor: colorScheme.surface,
           borderRadius: BorderRadius.circular(10),
@@ -343,7 +342,7 @@ class _MonitorScreenState extends ConsumerState<MonitorScreen> {
               child: Row(
                 children: [
                   Icon(
-                    target.isEmulator ? CupertinoIcons.device_phone_portrait : CupertinoIcons.device_desktop,
+                    target.isEmulator ? Iconsax.mobile : Iconsax.monitor,
                     size: 16,
                     color: colorScheme.primary,
                   ),
@@ -381,7 +380,7 @@ class _MonitorScreenState extends ConsumerState<MonitorScreen> {
             return AlertDialog(
               title: const Row(
                 children: [
-                  Icon(CupertinoIcons.slider_horizontal_3),
+                  Icon(Iconsax.setting_4),
                   SizedBox(width: 10),
                   Flexible(
                     child: Text(
@@ -403,7 +402,7 @@ class _MonitorScreenState extends ConsumerState<MonitorScreen> {
                       ),
                       const SizedBox(height: 12),
                       _buildToggleOption(
-                        icon: CupertinoIcons.speedometer,
+                        icon: Iconsax.cpu,
                         title: 'Live CPU Load & Waveform Chart',
                         subtitle: 'Real-time rolling CPU history curve',
                         value: cur.showCpuChart,
@@ -411,7 +410,7 @@ class _MonitorScreenState extends ConsumerState<MonitorScreen> {
                         colorScheme: colorScheme,
                       ),
                       _buildToggleOption(
-                        icon: CupertinoIcons.waveform_path_ecg,
+                        icon: Iconsax.ram,
                         title: 'RAM Usage & Memory Breakdown',
                         subtitle: 'Used vs Free RAM with saturation gauge',
                         value: cur.showRamGauge,
@@ -419,7 +418,7 @@ class _MonitorScreenState extends ConsumerState<MonitorScreen> {
                         colorScheme: colorScheme,
                       ),
                       _buildToggleOption(
-                        icon: CupertinoIcons.arrow_right_arrow_left,
+                        icon: Iconsax.wifi,
                         title: 'Network I/O & Bandwidth (RX / TX)',
                         subtitle: 'Real-time upload and download speeds',
                         value: cur.showNetworkTraffic,
@@ -427,7 +426,7 @@ class _MonitorScreenState extends ConsumerState<MonitorScreen> {
                         colorScheme: colorScheme,
                       ),
                       _buildToggleOption(
-                        icon: CupertinoIcons.battery_charging,
+                        icon: Iconsax.battery_charging,
                         title: 'Battery & Thermal State',
                         subtitle: 'Battery level, temperature, and charging status',
                         value: cur.showBatteryThermal,
@@ -435,7 +434,7 @@ class _MonitorScreenState extends ConsumerState<MonitorScreen> {
                         colorScheme: colorScheme,
                       ),
                       _buildToggleOption(
-                        icon: CupertinoIcons.chart_bar_alt_fill,
+                        icon: Iconsax.chart_2,
                         title: 'Top Active Processes',
                         subtitle: 'Processes consuming CPU on target',
                         value: cur.showTopProcesses,
@@ -443,7 +442,7 @@ class _MonitorScreenState extends ConsumerState<MonitorScreen> {
                         colorScheme: colorScheme,
                       ),
                       _buildToggleOption(
-                        icon: CupertinoIcons.tv,
+                        icon: Iconsax.monitor,
                         title: 'Display & Refresh Telemetry (FPS)',
                         subtitle: 'Estimated frame rendering rates and state',
                         value: cur.showDisplayFps,
@@ -613,16 +612,16 @@ class _CpuWaveformCard extends StatelessWidget {
       height: 210,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.6)),
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: colorScheme.outlineVariant, width: 0.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(CupertinoIcons.speedometer, color: color, size: 20),
+              Icon(Iconsax.cpu, color: color, size: 20),
               const SizedBox(width: 8),
               const Flexible(
                 child: Text(
@@ -696,16 +695,16 @@ class _RamUtilizationCard extends StatelessWidget {
       height: 210,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.6)),
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: colorScheme.outlineVariant, width: 0.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(CupertinoIcons.waveform_path_ecg, color: color, size: 20),
+              const Icon(Icons.memory_rounded, color: color, size: 20),
               const SizedBox(width: 8),
               const Flexible(
                 child: Text(
@@ -805,16 +804,16 @@ class _NetworkTrafficCard extends StatelessWidget {
       height: 190,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.6)),
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: colorScheme.outlineVariant, width: 0.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(CupertinoIcons.arrow_right_arrow_left, color: Colors.teal, size: 20),
+              const Icon(Icons.swap_horiz_rounded, color: Colors.teal, size: 20),
               const SizedBox(width: 8),
               const Flexible(
                 child: Text(
@@ -906,16 +905,16 @@ class _BatteryThermalCard extends StatelessWidget {
       height: 190,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.6)),
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: colorScheme.outlineVariant, width: 0.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Icon(CupertinoIcons.battery_charging, color: Colors.amber, size: 20),
+              Icon(Icons.battery_charging_full_rounded, color: Colors.amber, size: 20),
               SizedBox(width: 8),
               Flexible(
                 child: Text(
@@ -937,7 +936,7 @@ class _BatteryThermalCard extends StatelessWidget {
                   Text(metrics?.batteryStatus ?? 'Connected', style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
                 ],
               ),
-              Container(width: 1, height: 40, color: theme.dividerColor),
+              Container(width: 1, height: 40, color: colorScheme.outlineVariant),
               Column(
                 children: [
                   Text('${temp.toStringAsFixed(1)}°C', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.deepOrange)),
@@ -956,7 +955,7 @@ class _BatteryThermalCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(CupertinoIcons.thermometer, size: 16, color: Colors.deepOrange),
+                const Icon(Icons.thermostat_rounded, size: 16, color: Colors.deepOrange),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -992,16 +991,16 @@ class _TopProcessesCard extends StatelessWidget {
       height: 230,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.6)),
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: colorScheme.outlineVariant, width: 0.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(CupertinoIcons.chart_bar_alt_fill, color: Colors.indigo, size: 20),
+              const Icon(Icons.bar_chart_rounded, color: Colors.indigo, size: 20),
               const SizedBox(width: 8),
               const Text('Active Device Processes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
               const Spacer(),
@@ -1080,16 +1079,16 @@ class _DisplayFpsCard extends StatelessWidget {
       height: 230,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.6)),
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: colorScheme.outlineVariant, width: 0.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Icon(CupertinoIcons.tv, color: Colors.purple, size: 20),
+              Icon(Icons.smart_display_rounded, color: Colors.purple, size: 20),
               SizedBox(width: 8),
               Flexible(
                 child: Text(

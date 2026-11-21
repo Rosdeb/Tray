@@ -1,10 +1,10 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../core/utils/platform_paths.dart';
@@ -45,28 +45,28 @@ class SettingsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 14),
             _EnvironmentDetailRow(
-              icon: CupertinoIcons.layers_alt_fill,
+              icon: Iconsax.layer,
               label: 'JDK 17+ (Java Home)',
               value: sdk?.javaHome ?? 'Portable JDK / System JDK',
               statusOk: sdk?.javaHome != null,
             ),
             const Divider(height: 16),
             _EnvironmentDetailRow(
-              icon: CupertinoIcons.folder,
+              icon: Icons.folder_outlined,
               label: 'Android SDK Root',
               value: sdk?.path ?? 'Not configured',
               statusOk: sdk != null,
             ),
             const Divider(height: 16),
             _EnvironmentDetailRow(
-              icon: CupertinoIcons.chevron_left_slash_chevron_right,
+              icon: Icons.terminal_rounded,
               label: 'cmdline-tools (sdkmanager & avdmanager)',
               value: sdk?.hasCmdlineTools == true ? 'Installed' : 'Missing',
               statusOk: sdk?.hasCmdlineTools == true,
             ),
             const Divider(height: 16),
             _EnvironmentDetailRow(
-              icon: CupertinoIcons.macwindow,
+              icon: Icons.computer_rounded,
               label: 'Emulator Binary',
               value: sdk?.hasEmulator == true
                   ? (sdk?.version ?? sdk!.emulatorPath)
@@ -75,7 +75,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
             const Divider(height: 16),
             _EnvironmentDetailRow(
-              icon: CupertinoIcons.link,
+              icon: Icons.link_rounded,
               label: 'Platform Tools (ADB)',
               value: sdk?.hasAdb == true ? sdk!.adbPath : 'Missing',
               statusOk: sdk?.hasAdb == true,
@@ -85,19 +85,19 @@ class SettingsScreen extends ConsumerWidget {
               skipLoadingOnReload: true,
               skipLoadingOnRefresh: true,
               data: (info) => _EnvironmentDetailRow(
-                icon: CupertinoIcons.speedometer,
+                icon: Iconsax.cpu,
                 label: 'Hardware Acceleration',
                 value: info.isAvailable ? info.hypervisorType ?? 'Active' : info.message,
                 statusOk: info.isAvailable,
               ),
               loading: () => const _EnvironmentDetailRow(
-                icon: CupertinoIcons.speedometer,
+                icon: Iconsax.cpu,
                 label: 'Hardware Acceleration',
                 value: 'Checking...',
                 statusOk: true,
               ),
               error: (_, _) => const _EnvironmentDetailRow(
-                icon: CupertinoIcons.speedometer,
+                icon: Iconsax.cpu,
                 label: 'Hardware Acceleration',
                 value: 'Check failed',
                 statusOk: false,
@@ -108,7 +108,7 @@ class SettingsScreen extends ConsumerWidget {
               skipLoadingOnReload: true,
               skipLoadingOnRefresh: true,
               data: (info) => _EnvironmentDetailRow(
-                icon: CupertinoIcons.tv,
+                icon: Iconsax.monitor,
                 label: 'Screen Mirroring (scrcpy)',
                 value: info.isAvailable
                     ? (info.version != null ? '${info.version} (Ready)' : 'Installed and available')
@@ -116,13 +116,13 @@ class SettingsScreen extends ConsumerWidget {
                 statusOk: info.isAvailable,
               ),
               loading: () => const _EnvironmentDetailRow(
-                icon: CupertinoIcons.tv,
+                icon: Iconsax.monitor,
                 label: 'Screen Mirroring (scrcpy)',
                 value: 'Checking...',
                 statusOk: true,
               ),
               error: (_, _) => const _EnvironmentDetailRow(
-                icon: CupertinoIcons.tv,
+                icon: Iconsax.monitor,
                 label: 'Screen Mirroring (scrcpy)',
                 value: 'Not found',
                 statusOk: false,
@@ -135,7 +135,7 @@ class SettingsScreen extends ConsumerWidget {
               children: [
                 FilledButton.icon(
                   onPressed: () => SdkSetupDialog.show(context),
-                  icon: const Icon(CupertinoIcons.wrench_fill),
+                  icon: const Icon(Icons.build_rounded),
                   label: const Text('Setup / Repair Android Environment'),
                 ),
                 OutlinedButton.icon(
@@ -146,7 +146,7 @@ class SettingsScreen extends ConsumerWidget {
                     ref.invalidate(biosAndHardwareInfoProvider);
                     ref.read(emulatorControllerProvider.notifier).refresh();
                   },
-                  icon: const Icon(CupertinoIcons.refresh),
+                  icon: const Icon(Icons.refresh_rounded),
                   label: const Text('Re-check System'),
                 ),
               ],
@@ -179,7 +179,7 @@ class SettingsScreen extends ConsumerWidget {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Icon(
-                            isCustom ? CupertinoIcons.folder_badge_person_crop : CupertinoIcons.folder,
+                            isCustom ? Icons.folder_special_outlined : Icons.folder_outlined,
                             color: isCustom ? Colors.purple : Theme.of(innerContext).colorScheme.primary,
                             size: 22,
                           ),
@@ -236,7 +236,7 @@ class SettingsScreen extends ConsumerWidget {
                               Row(
                                 children: <Widget>[
                                   Icon(
-                                    isSdkConfigured ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.exclamationmark_triangle_fill,
+                                    isSdkConfigured ? Icons.check_circle_rounded : Icons.warning_amber_rounded,
                                     size: 16,
                                     color: isSdkConfigured ? Colors.green : Colors.amber.shade800,
                                   ),
@@ -330,7 +330,7 @@ class SettingsScreen extends ConsumerWidget {
                                   }
                                 }
                               },
-                              icon: const Icon(CupertinoIcons.folder_open, size: 16),
+                              icon: const Icon(Icons.folder_open_outlined, size: 16),
                               label: const Text('Choose Folder'),
                             ),
                             FilledButton.tonal(
@@ -392,9 +392,9 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 18),
             SegmentedButton<ThemeMode>(
               segments: const <ButtonSegment<ThemeMode>>[
-                ButtonSegment(value: ThemeMode.system, label: Text('System'), icon: Icon(CupertinoIcons.circle_righthalf_fill)),
-                ButtonSegment(value: ThemeMode.light, label: Text('Light'), icon: Icon(CupertinoIcons.sun_max)),
-                ButtonSegment(value: ThemeMode.dark, label: Text('Dark'), icon: Icon(CupertinoIcons.moon)),
+                ButtonSegment(value: ThemeMode.system, label: Text('System'), icon: Icon(Icons.brightness_auto_rounded)),
+                ButtonSegment(value: ThemeMode.light, label: Text('Light'), icon: Icon(Icons.light_mode_rounded)),
+                ButtonSegment(value: ThemeMode.dark, label: Text('Dark'), icon: Icon(Icons.dark_mode_rounded)),
               ],
               selected: <ThemeMode>{settings.themeMode},
               onSelectionChanged: (selection) => controller.setThemeMode(selection.first),
@@ -438,7 +438,7 @@ class SettingsScreen extends ConsumerWidget {
           children: <Widget>[
             Row(
               children: <Widget>[
-                const Icon(CupertinoIcons.timer),
+                const Icon(Icons.timer_outlined),
                 Expanded(
                   child: Slider(
                     min: 3,
@@ -573,7 +573,7 @@ class _UpdateSettingsSectionState extends ConsumerState<_UpdateSettingsSection> 
         const SizedBox(height: 8),
         Row(
           children: <Widget>[
-            const Icon(CupertinoIcons.info_circle, size: 28),
+            const Icon(Icons.info_outline_rounded, size: 28),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -602,7 +602,7 @@ class _UpdateSettingsSectionState extends ConsumerState<_UpdateSettingsSection> 
                         height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(CupertinoIcons.arrow_clockwise, size: 16),
+                    : const Icon(Icons.refresh_rounded, size: 16),
                 label: Text(_checking ? 'Checking...' : 'Check for Updates'),
               ),
           ],
@@ -631,7 +631,7 @@ class _UpdateSettingsSectionState extends ConsumerState<_UpdateSettingsSection> 
             ),
             child: Row(
               children: <Widget>[
-                Icon(CupertinoIcons.arrow_down_circle_fill, color: colorScheme.primary, size: 24),
+                Icon(Icons.download_rounded, color: colorScheme.primary, size: 24),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -654,7 +654,7 @@ class _UpdateSettingsSectionState extends ConsumerState<_UpdateSettingsSection> 
                 const SizedBox(width: 12),
                 FilledButton.icon(
                   onPressed: () => _startUpdate(updateInfo),
-                  icon: const Icon(CupertinoIcons.arrow_down_to_line, size: 16),
+                  icon: const Icon(Icons.download_outlined, size: 16),
                   label: const Text('Update Now'),
                 ),
               ],
@@ -664,7 +664,7 @@ class _UpdateSettingsSectionState extends ConsumerState<_UpdateSettingsSection> 
           const SizedBox(height: 12),
           Row(
             children: <Widget>[
-              const Icon(CupertinoIcons.checkmark_circle_fill, color: Colors.green, size: 18),
+              const Icon(Icons.check_circle_rounded, color: Colors.green, size: 18),
               const SizedBox(width: 8),
               Text(
                 'Simulation Tray is up to date (v${result.currentVersion}).',
@@ -676,7 +676,7 @@ class _UpdateSettingsSectionState extends ConsumerState<_UpdateSettingsSection> 
           const SizedBox(height: 12),
           Row(
             children: <Widget>[
-              const Icon(CupertinoIcons.exclamationmark_triangle_fill, color: Colors.orange, size: 18),
+              const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 18),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -728,7 +728,7 @@ class _EnvironmentDetailRow extends StatelessWidget {
                       ),
                     ),
                     Icon(
-                      statusOk ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.exclamationmark_triangle_fill,
+                      statusOk ? Icons.check_circle_rounded : Icons.warning_amber_rounded,
                       size: 15,
                       color: statusOk ? Colors.green : Colors.amber,
                     ),
@@ -778,7 +778,7 @@ class _EnvironmentDetailRow extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Icon(
-                statusOk ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.exclamationmark_triangle_fill,
+                statusOk ? Icons.check_circle_rounded : Icons.warning_amber_rounded,
                 size: 16,
                 color: statusOk ? Colors.green : Colors.amber,
               ),
@@ -846,7 +846,7 @@ class _ScrcpySettingsSection extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(
-                        isAvailable ? CupertinoIcons.tv : CupertinoIcons.tv_fill,
+                        isAvailable ? Iconsax.monitor : Iconsax.monitor,
                         color: isAvailable
                             ? (isCustom ? Colors.purple : Theme.of(context).colorScheme.primary)
                             : Colors.amber.shade800,
@@ -947,7 +947,7 @@ class _ScrcpySettingsSection extends ConsumerWidget {
                         const SizedBox(width: 8),
                         IconButton(
                           tooltip: 'Copy path',
-                          icon: const Icon(CupertinoIcons.doc_on_clipboard, size: 16),
+                          icon: const Icon(Icons.copy_rounded, size: 16),
                           visualDensity: VisualDensity.compact,
                           onPressed: () {
                             Clipboard.setData(ClipboardData(text: resolvedPath));
@@ -970,8 +970,8 @@ class _ScrcpySettingsSection extends ConsumerWidget {
                   children: <Widget>[
                     Icon(
                       isAvailable
-                          ? CupertinoIcons.checkmark_circle_fill
-                          : CupertinoIcons.exclamationmark_triangle_fill,
+                          ? Icons.check_circle_rounded
+                          : Icons.warning_amber_rounded,
                       size: 15,
                       color: isAvailable ? Colors.green : Colors.amber.shade800,
                     ),
@@ -1042,7 +1042,7 @@ class _ScrcpySettingsSection extends ConsumerWidget {
                           }
                         }
                       },
-                      icon: const Icon(CupertinoIcons.doc_text, size: 16),
+                      icon: const Icon(Icons.description_outlined, size: 16),
                       label: const Text('Browse Executable'),
                     ),
                     OutlinedButton.icon(
@@ -1088,7 +1088,7 @@ class _ScrcpySettingsSection extends ConsumerWidget {
                           }
                         }
                       },
-                      icon: const Icon(CupertinoIcons.folder, size: 16),
+                      icon: const Icon(Icons.folder_outlined, size: 16),
                       label: const Text('Select Folder'),
                     ),
                     OutlinedButton.icon(
@@ -1111,18 +1111,18 @@ class _ScrcpySettingsSection extends ConsumerWidget {
                           );
                         }
                       },
-                      icon: const Icon(CupertinoIcons.refresh, size: 16),
+                      icon: const Icon(Icons.refresh_rounded, size: 16),
                       label: Text(isCustom ? 'Reset to Auto' : 'Rescan'),
                     ),
                     if (!isAvailable) ...[
                       FilledButton.icon(
                         onPressed: () => ScrcpyInstallDialog.show(context),
-                        icon: const Icon(CupertinoIcons.cloud_download, size: 16),
+                        icon: const Icon(Icons.cloud_download_outlined, size: 16),
                         label: const Text('Install scrcpy (1-Click)'),
                       ),
                       OutlinedButton.icon(
                         onPressed: () => SystemEnvironmentService.openScrcpyDownloadPage(),
-                        icon: const Icon(CupertinoIcons.arrow_up_right, size: 14),
+                        icon: const Icon(Icons.open_in_new_rounded, size: 14),
                         label: const Text('Official Releases'),
                       ),
                     ],
@@ -1146,7 +1146,7 @@ class _ScrcpySettingsSection extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         Icon(
-                          CupertinoIcons.info_circle,
+                          Icons.info_outline_rounded,
                           size: 18,
                           color: Theme.of(context).colorScheme.primary,
                         ),
@@ -1226,7 +1226,7 @@ class _HardwareVirtualizationSection extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(
-                        isOverallActive ? Icons.memory : CupertinoIcons.exclamationmark_shield,
+                        isOverallActive ? Icons.memory : Icons.shield_outlined,
                         color: isOverallActive ? Colors.teal : Colors.amber.shade800,
                         size: 22,
                       ),
@@ -1328,13 +1328,13 @@ class _HardwareVirtualizationSection extends ConsumerWidget {
                         context,
                         initialVendor: info.motherboardManufacturer ?? info.biosVendor,
                       ),
-                      icon: const Icon(CupertinoIcons.book_fill, size: 16),
+                      icon: const Icon(Icons.menu_book_rounded, size: 16),
                       label: const Text('BIOS Virtualization Guide'),
                     ),
                     if (Platform.isWindows) ...[
                       OutlinedButton.icon(
                         onPressed: () => _confirmRebootToBios(context, ref),
-                        icon: const Icon(CupertinoIcons.restart, size: 16),
+                        icon: const Icon(Icons.restart_alt_rounded, size: 16),
                         label: const Text('Reboot directly to UEFI BIOS'),
                       ),
                       if (!isHypervisorActive)
@@ -1354,14 +1354,14 @@ class _HardwareVirtualizationSection extends ConsumerWidget {
                               );
                             }
                           },
-                          icon: const Icon(CupertinoIcons.wrench, size: 16),
+                          icon: const Icon(Icons.build_outlined, size: 16),
                           label: const Text('Enable WHPX (Admin)'),
                         ),
                       OutlinedButton.icon(
                         onPressed: () => SystemEnvironmentService.openMotherboardBiosSupportPage(
                           info.motherboardManufacturer ?? info.biosVendor,
                         ),
-                        icon: const Icon(CupertinoIcons.arrow_up_right, size: 14),
+                        icon: const Icon(Icons.open_in_new_rounded, size: 14),
                         label: const Text('Motherboard Support / BIOS'),
                       ),
                     ],
@@ -1370,7 +1370,7 @@ class _HardwareVirtualizationSection extends ConsumerWidget {
                         ref.invalidate(biosAndHardwareInfoProvider);
                         ref.invalidate(hardwareAccelerationProvider);
                       },
-                      icon: const Icon(CupertinoIcons.refresh, size: 16),
+                      icon: const Icon(Icons.refresh_rounded, size: 16),
                       label: const Text('Rescan Hardware'),
                     ),
                   ],
@@ -1392,7 +1392,7 @@ class _HardwareVirtualizationSection extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Icon(
-                        CupertinoIcons.shield_fill,
+                        Icons.shield_rounded,
                         size: 16,
                         color: theme.colorScheme.primary,
                       ),
@@ -1425,7 +1425,7 @@ class _HardwareVirtualizationSection extends ConsumerWidget {
       builder: (dialogCtx) => AlertDialog(
         title: const Row(
           children: [
-            Icon(CupertinoIcons.restart, color: Colors.amber),
+            Icon(Icons.restart_alt_rounded, color: Colors.amber),
             SizedBox(width: 8),
             Text('Reboot to UEFI BIOS Setup?'),
           ],

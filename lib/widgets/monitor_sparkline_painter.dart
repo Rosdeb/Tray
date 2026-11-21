@@ -112,6 +112,11 @@ class MonitorSparklinePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant MonitorSparklinePainter oldDelegate) {
-    return oldDelegate.data != data || oldDelegate.lineColor != lineColor;
+    if (oldDelegate.lineColor != lineColor) return true;
+    if (identical(oldDelegate.data, data)) return false;
+    if (oldDelegate.data.length != data.length) return true;
+    if (data.isEmpty) return false;
+    return oldDelegate.data.last.value != data.last.value ||
+        oldDelegate.data.last.timestamp != data.last.timestamp;
   }
 }

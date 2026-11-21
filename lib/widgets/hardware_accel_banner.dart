@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../models/hardware_acceleration.dart';
@@ -23,7 +23,7 @@ class HardwareAccelBanner extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Icon(CupertinoIcons.checkmark_circle, color: Colors.green, size: 20),
+            const Icon(Icons.check_circle_outline_rounded, color: Colors.green, size: 20),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -46,7 +46,7 @@ class HardwareAccelBanner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const Icon(CupertinoIcons.exclamationmark_triangle_fill, color: Colors.amber, size: 24),
+          const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 24),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -87,7 +87,7 @@ class HardwareAccelBanner extends StatelessWidget {
       builder: (context) => AlertDialog(
         title: const Row(
           children: [
-            Icon(CupertinoIcons.speedometer, color: Colors.amber),
+            Icon(Iconsax.cpu, color: Colors.amber),
             SizedBox(width: 10),
             Text('Hardware Acceleration Setup'),
           ],

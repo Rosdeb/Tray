@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -156,7 +156,7 @@ class _SdkSetupDialogState extends ConsumerState<SdkSetupDialog> {
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(
-            CupertinoIcons.device_phone_portrait,
+            Iconsax.mobile,
             color: Theme.of(context).colorScheme.onPrimaryContainer,
             size: 28,
           ),
@@ -183,7 +183,7 @@ class _SdkSetupDialogState extends ConsumerState<SdkSetupDialog> {
         if (!_isInstalling)
           IconButton(
             onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(CupertinoIcons.xmark),
+            icon: const Icon(Icons.close_rounded),
           ),
       ],
     );
@@ -220,12 +220,12 @@ class _SdkSetupDialogState extends ConsumerState<SdkSetupDialog> {
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 10),
-              _buildComponentRow(CupertinoIcons.layers_alt_fill, 'Eclipse Temurin OpenJDK 17+', 'Java runtime for sdkmanager and avdmanager'),
-              _buildComponentRow(CupertinoIcons.chevron_left_slash_chevron_right, 'Android cmdline-tools', 'sdkmanager and avdmanager binaries from Google'),
-              _buildComponentRow(CupertinoIcons.macwindow, 'Official Android Emulator', 'Google QEMU-based hardware-accelerated emulator'),
-              _buildComponentRow(CupertinoIcons.link, 'Android Platform Tools', 'ADB (Android Debug Bridge) for state tracking & control'),
-              _buildComponentRow(CupertinoIcons.photo, 'System Image (Google APIs)', 'Android 34 Google APIs ($abi) for full compatibility'),
-              _buildComponentRow(CupertinoIcons.device_phone_portrait, 'Initial Virtual Device (AVD)', 'Configured Pixel profile ready to boot'),
+              _buildComponentRow(Iconsax.layer, 'Eclipse Temurin OpenJDK 17+', 'Java runtime for sdkmanager and avdmanager'),
+              _buildComponentRow(Icons.terminal_rounded, 'Android cmdline-tools', 'sdkmanager and avdmanager binaries from Google'),
+              _buildComponentRow(Icons.computer_rounded, 'Official Android Emulator', 'Google QEMU-based hardware-accelerated emulator'),
+              _buildComponentRow(Icons.link_rounded, 'Android Platform Tools', 'ADB (Android Debug Bridge) for state tracking & control'),
+              _buildComponentRow(Icons.image_rounded, 'System Image (Google APIs)', 'Android 34 Google APIs ($abi) for full compatibility'),
+              _buildComponentRow(Iconsax.mobile, 'Initial Virtual Device (AVD)', 'Configured Pixel profile ready to boot'),
             ],
           ),
         ),
@@ -240,7 +240,7 @@ class _SdkSetupDialogState extends ConsumerState<SdkSetupDialog> {
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
                   isDense: true,
-                  prefixIcon: Icon(CupertinoIcons.folder_open),
+                  prefixIcon: Icon(Icons.folder_open_outlined),
                   hintText: 'Enter destination path',
                 ),
               ),
@@ -248,7 +248,7 @@ class _SdkSetupDialogState extends ConsumerState<SdkSetupDialog> {
             const SizedBox(width: 8),
             FilledButton.tonalIcon(
               onPressed: _pickDirectory,
-              icon: const Icon(CupertinoIcons.folder),
+              icon: const Icon(Icons.folder_outlined),
               label: const Text('Browse'),
             ),
           ],
@@ -256,7 +256,7 @@ class _SdkSetupDialogState extends ConsumerState<SdkSetupDialog> {
         const SizedBox(height: 12),
         Row(
           children: [
-            Icon(CupertinoIcons.info_circle, size: 16, color: Theme.of(context).colorScheme.outline),
+            Icon(Icons.info_outline_rounded, size: 16, color: Theme.of(context).colorScheme.outline),
             const SizedBox(width: 6),
             Expanded(
               child: Text(
@@ -362,9 +362,9 @@ class _SdkSetupDialogState extends ConsumerState<SdkSetupDialog> {
             if (_isInstalling)
               const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
             else if (p?.isDone == true)
-              const Icon(CupertinoIcons.checkmark_circle_fill, color: Colors.green)
+              const Icon(Icons.check_circle_rounded, color: Colors.green)
             else if (p?.hasError == true)
-              const Icon(CupertinoIcons.exclamationmark_circle_fill, color: Colors.red),
+              const Icon(Icons.error_rounded, color: Colors.red),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -431,7 +431,7 @@ class _SdkSetupDialogState extends ConsumerState<SdkSetupDialog> {
             onPressed: _pathController.text.trim().isEmpty
                 ? null
                 : () => setState(() => _currentStep = 1),
-            icon: const Icon(CupertinoIcons.arrow_right),
+            icon: const Icon(Icons.arrow_forward_rounded),
             label: const Text('Next: Review License'),
           ),
         ],
@@ -442,12 +442,12 @@ class _SdkSetupDialogState extends ConsumerState<SdkSetupDialog> {
         children: [
           OutlinedButton.icon(
             onPressed: () => setState(() => _currentStep = 0),
-            icon: const Icon(CupertinoIcons.arrow_left),
+            icon: const Icon(Icons.arrow_back_rounded),
             label: const Text('Back'),
           ),
           FilledButton.icon(
             onPressed: _acceptedLicense ? _startSetup : null,
-            icon: const Icon(CupertinoIcons.arrow_down_to_line),
+            icon: const Icon(Icons.download_outlined),
             label: const Text('Accept & Start Setup'),
           ),
         ],

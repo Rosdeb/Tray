@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -62,7 +62,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
       screenSize: '6.3"',
       resolution: '1280 × 2856',
       density: '495 dpi',
-      icon: CupertinoIcons.device_phone_portrait,
+      icon: Iconsax.mobile,
     ),
     DeviceProfileInfo(
       id: 'pixel_9',
@@ -71,7 +71,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
       screenSize: '6.3"',
       resolution: '1080 × 2424',
       density: '422 dpi',
-      icon: CupertinoIcons.device_phone_portrait,
+      icon: Iconsax.mobile,
     ),
     DeviceProfileInfo(
       id: 'pixel_8_pro',
@@ -80,7 +80,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
       screenSize: '6.7"',
       resolution: '1344 × 2992',
       density: '489 dpi',
-      icon: CupertinoIcons.device_phone_portrait,
+      icon: Iconsax.mobile,
     ),
     DeviceProfileInfo(
       id: 'pixel_8',
@@ -89,7 +89,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
       screenSize: '6.2"',
       resolution: '1080 × 2400',
       density: '428 dpi',
-      icon: CupertinoIcons.device_phone_portrait,
+      icon: Iconsax.mobile,
     ),
     DeviceProfileInfo(
       id: 'pixel_7_pro',
@@ -98,7 +98,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
       screenSize: '6.7"',
       resolution: '1440 × 3120',
       density: '512 dpi',
-      icon: CupertinoIcons.device_phone_portrait,
+      icon: Iconsax.mobile,
     ),
     DeviceProfileInfo(
       id: 'pixel_7',
@@ -107,7 +107,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
       screenSize: '6.3"',
       resolution: '1080 × 2400',
       density: '416 dpi',
-      icon: CupertinoIcons.device_phone_portrait,
+      icon: Iconsax.mobile,
     ),
     DeviceProfileInfo(
       id: 'pixel_6_pro',
@@ -116,7 +116,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
       screenSize: '6.7"',
       resolution: '1440 × 3120',
       density: '512 dpi',
-      icon: CupertinoIcons.device_phone_portrait,
+      icon: Iconsax.mobile,
     ),
     DeviceProfileInfo(
       id: 'pixel_6',
@@ -125,7 +125,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
       screenSize: '6.4"',
       resolution: '1080 × 2400',
       density: '411 dpi',
-      icon: CupertinoIcons.device_phone_portrait,
+      icon: Iconsax.mobile,
     ),
     DeviceProfileInfo(
       id: 'pixel_fold',
@@ -134,7 +134,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
       screenSize: '7.6" / 5.8"',
       resolution: '1840 × 2208',
       density: '380 dpi',
-      icon: CupertinoIcons.rectangle_split_3x1,
+      icon: Icons.view_carousel_rounded,
     ),
     DeviceProfileInfo(
       id: 'pixel_tablet',
@@ -143,7 +143,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
       screenSize: '10.95"',
       resolution: '2560 × 1600',
       density: '276 dpi',
-      icon: CupertinoIcons.device_phone_landscape,
+      icon: Iconsax.mobile,
     ),
     DeviceProfileInfo(
       id: 'resizable',
@@ -152,7 +152,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
       screenSize: 'Adaptive',
       resolution: 'Multi-window',
       density: 'Auto dpi',
-      icon: CupertinoIcons.arrow_up_left_arrow_down_right,
+      icon: Icons.open_with_rounded,
     ),
     DeviceProfileInfo(
       id: 'medium_phone',
@@ -161,7 +161,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
       screenSize: '6.0"',
       resolution: '1080 × 2400',
       density: '420 dpi',
-      icon: CupertinoIcons.device_phone_portrait,
+      icon: Iconsax.mobile,
     ),
     DeviceProfileInfo(
       id: 'medium_tablet',
@@ -170,7 +170,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
       screenSize: '10.1"',
       resolution: '1920 × 1200',
       density: '224 dpi',
-      icon: CupertinoIcons.device_phone_landscape,
+      icon: Iconsax.mobile,
     ),
     DeviceProfileInfo(
       id: 'nexus_5',
@@ -179,7 +179,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
       screenSize: '4.95"',
       resolution: '1080 × 1920',
       density: '445 dpi',
-      icon: CupertinoIcons.device_phone_portrait,
+      icon: Iconsax.mobile,
     ),
     DeviceProfileInfo(
       id: 'tv_1080p',
@@ -188,7 +188,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
       screenSize: '1080p',
       resolution: '1920 × 1080',
       density: '320 dpi',
-      icon: CupertinoIcons.tv,
+      icon: Iconsax.monitor,
     ),
   ];
 
@@ -288,7 +288,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
           SnackBar(
             content: Row(
               children: [
-                const Icon(CupertinoIcons.checkmark_circle_fill, color: Colors.white, size: 20),
+                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
                 const SizedBox(width: 8),
                 Expanded(child: Text('Virtual Device "$name" created successfully! Ready to launch.')),
               ],
@@ -376,7 +376,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
               color: theme.colorScheme.primary.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(CupertinoIcons.device_phone_portrait, color: theme.colorScheme.primary, size: 22),
+            child: Icon(Iconsax.mobile, color: theme.colorScheme.primary, size: 22),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -397,7 +397,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
           ),
           IconButton(
             onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-            icon: const Icon(CupertinoIcons.xmark, size: 20),
+            icon: const Icon(Icons.close_rounded, size: 20),
             tooltip: 'Close',
           ),
         ],
@@ -509,7 +509,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
                         ),
                       ),
                       if (isSelected)
-                        Icon(CupertinoIcons.checkmark_circle_fill, size: 18, color: theme.colorScheme.primary),
+                        Icon(Icons.check_circle_rounded, size: 18, color: theme.colorScheme.primary),
                     ],
                   ),
                 ),
@@ -568,7 +568,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
                     _nameController.text = _formatName(_selectedDevice.name, _selectedVersion.api);
                   });
                 },
-                icon: const Icon(CupertinoIcons.arrow_counterclockwise, size: 14),
+                icon: const Icon(Icons.undo_rounded, size: 14),
                 label: const Text('Reset Name', style: TextStyle(fontSize: 12)),
               ),
             ],
@@ -578,7 +578,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
             controller: _nameController,
             decoration: InputDecoration(
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-              prefixIcon: const Icon(CupertinoIcons.pencil, size: 18),
+              prefixIcon: const Icon(Icons.edit_rounded, size: 18),
               isDense: true,
               hintText: 'e.g. Pixel_8_API_34',
             ),
@@ -618,7 +618,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(CupertinoIcons.exclamationmark_circle, color: Colors.red, size: 20),
+                  const Icon(Icons.error_outline_rounded, color: Colors.red, size: 20),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -666,7 +666,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
               child: Row(
                 children: [
                   Icon(
-                    isSelected ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.circle,
+                    isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
                     size: 20,
                     color: isSelected ? theme.colorScheme.primary : theme.dividerColor,
                   ),
@@ -719,7 +719,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          hasImg ? CupertinoIcons.checkmark_alt : CupertinoIcons.arrow_down_to_line,
+                          hasImg ? Icons.check_rounded : Icons.download_outlined,
                           size: 12,
                           color: hasImg ? Colors.green : Colors.orange.shade800,
                         ),
@@ -761,7 +761,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
       child: Row(
         children: [
           Icon(
-            isDownloaded ? CupertinoIcons.checkmark_seal_fill : CupertinoIcons.cloud_download_fill,
+            isDownloaded ? Icons.verified_rounded : Icons.cloud_download_rounded,
             color: isDownloaded ? Colors.green : Colors.amber.shade900,
             size: 20,
           ),
@@ -1007,7 +1007,7 @@ class _CreateAvdDialogState extends ConsumerState<CreateAvdDialog> {
           FilledButton.icon(
             onPressed: _isLoading ? null : _createAvd,
             icon: Icon(
-              isDownloaded ? CupertinoIcons.checkmark_alt : CupertinoIcons.arrow_down_to_line,
+              isDownloaded ? Icons.check_rounded : Icons.download_outlined,
               size: 16,
             ),
             label: Text(
