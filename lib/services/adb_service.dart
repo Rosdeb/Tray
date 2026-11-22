@@ -286,6 +286,19 @@ class AdbService {
     );
   }
 
+  /// Starts logcat filtered by PID for app-specific logs.
+  Future<Process> startLogcatForPid({
+    required String adbPath,
+    required String serial,
+    required String pid,
+  }) async {
+    return Process.start(
+      adbPath,
+      <String>['-s', serial, 'logcat', '-v', 'time', '--pid=$pid'],
+      runInShell: false,
+    );
+  }
+
   /// Clears logcat buffer on device using `adb logcat -c`.
   Future<void> clearLogcat({
     required String adbPath,
