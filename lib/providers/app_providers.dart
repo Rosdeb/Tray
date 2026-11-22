@@ -1024,14 +1024,18 @@ class DeviceLogsController extends Notifier<DeviceLogsState> {
   Process? _logcatProcess;
   StreamSubscription<String>? _logcatSub;
   Timer? _batchTimer;
+  Timer? _reconnectTimer;
   final List<LogEntry> _pendingEntries = <LogEntry>[];
   static const int _maxEntries = 2000;
   LogEntry? _lastParsedEntry;
+  int _reconnectAttempts = 0;
+  static const int _maxReconnectAttempts = 5;
 
   @override
   DeviceLogsState build() {
     ref.onDispose(() {
       _cleanupStream();
+      _reconnectTimer?.cancel();
     });
 
     ref.listen<AsyncValue<EmulatorState>>(
@@ -1167,14 +1171,19 @@ class DeviceLogsController extends Notifier<DeviceLogsState> {
             errorMessage: 'Logcat stream error: $err',
             isStreaming: false,
           );
+          _scheduleReconnect();
         },
         onDone: () {
-          state = state.copyWith(isStreaming: false);
+          if (state.isStreaming) {
+            state = state.copyWith(isStreaming: false);
+            _scheduleReconnect();
+          }
         },
       );
 
       process.stderr.listen((_) {});
 
+      _reconnectAttempts = 0;
       state = state.copyWith(
         isStreaming: true,
         clearErrorMessage: true,
@@ -1344,15 +1353,53 @@ class DeviceLogsController extends Notifier<DeviceLogsState> {
   }
 
   Future<void> restartStream() async {
+    _reconnectAttempts = 0;
     final currentTarget = state.selectedTargetId;
     if (currentTarget != null) {
       await selectTarget(currentTarget);
     }
   }
 
+  void _scheduleReconnect() {
+    if (_reconnectAttempts >= _maxReconnectAttempts) return;
+    final targetId = state.selectedTargetId;
+    if (targetId == null || targetId == 'app') return;
+
+    _reconnectAttempts++;
+    final delay = Duration(seconds: _reconnectAttempts * 2);
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(delay, () async {
+      if (state.selectedTargetId == targetId && !state.isStreaming) {
+        await selectTarget(targetId);
+      }
+    });
+  }
+
+  Future<void> openInTerminal() async {
+    final adbPath = ref.read(emulatorControllerProvider).value?.sdk?.adbPath;
+    final targetId = state.selectedTargetId;
+    if (adbPath == null || targetId == null || targetId == 'app') return;
+
+    final target = state.targets.firstWhere(
+      (t) => t.id == targetId,
+      orElse: () => LogTarget(id: targetId, displayName: targetId, serial: targetId),
+    );
+    final serial = target.serial ?? target.id;
+    final logService = ref.read(deviceLogServiceProvider);
+
+    await logService.openLogcatInTerminal(
+      adbPath: adbPath,
+      serial: serial,
+      pid: state.activeAppPid,
+      packageName: state.selectedPackage,
+    );
+  }
+
   void _cleanupStream() {
     _batchTimer?.cancel();
     _batchTimer = null;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
     _pendingEntries.clear();
     _logcatSub?.cancel();
     _logcatSub = null;

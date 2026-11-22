@@ -306,4 +306,39 @@ class DeviceLogService {
         return false;
     }
   }
+
+  Future<Process> startLogcatForPid({
+    required String adbPath,
+    required String serial,
+    required String pid,
+  }) {
+    return adbService.startLogcatForPid(adbPath: adbPath, serial: serial, pid: pid);
+  }
+
+  Future<void> openLogcatInTerminal({
+    required String adbPath,
+    required String serial,
+    String? pid,
+    String? packageName,
+  }) async {
+    final pidFilter = pid != null && pid.isNotEmpty ? ' --pid=$pid' : '';
+    final adbCmd = '$adbPath -s $serial logcat -v time$pidFilter';
+
+    if (Platform.isMacOS) {
+      final script = 'tell application "Terminal"\n'
+          'do script "$adbCmd"\n'
+          'activate\n'
+          'end tell';
+      await Process.start('osascript', ['-e', script]);
+    } else if (Platform.isWindows) {
+      final title = packageName != null
+          ? 'Logcat - $packageName'
+          : 'Logcat - $serial';
+      await Process.start(
+        'cmd',
+        ['/c', 'start', 'cmd', '/k', 'title $title && $adbCmd'],
+        runInShell: true,
+      );
+    }
+  }
 }

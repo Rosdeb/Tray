@@ -198,6 +198,13 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
                       icon: const Icon(Icons.copy_outlined, size: 16),
                     ),
                     IconButton.filledTonal(
+                      tooltip: 'Open logcat in external terminal',
+                      onPressed: selectedTarget.isAppLogs
+                          ? null
+                          : () => ref.read(deviceLogsControllerProvider.notifier).openInTerminal(),
+                      icon: const Icon(Iconsax.monitor, size: 16),
+                    ),
+                    IconButton.filledTonal(
                       tooltip: 'Restart logcat stream',
                       onPressed: () async {
                         await ref.read(emulatorControllerProvider.notifier).refresh();
@@ -296,26 +303,32 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
 
             if (logsState.errorMessage != null) ...[
               const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.warning_amber, color: Colors.red, size: 16),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        logsState.errorMessage!,
-                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.red),
+              Builder(builder: (context) {
+                final isDark = Theme.of(context).brightness == Brightness.dark;
+                final errorBg = isDark ? const Color(0xFF3B0D0D) : const Color(0xFFFFEBEE);
+                final errorFg = isDark ? const Color(0xFFEF5350) : const Color(0xFFC62828);
+                final errorBorder = isDark ? const Color(0xFF5B1A1A) : const Color(0xFFEF9A9A);
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: errorBg,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: errorBorder),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber, color: errorFg, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          logsState.errorMessage!,
+                          style: theme.textTheme.bodySmall?.copyWith(color: errorFg),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
+                    ],
+                  ),
+                );
+              }),
             ],
 
             const SizedBox(height: 12),
@@ -514,41 +527,49 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
     if (isAppLogs) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.blueGrey.withValues(alpha: 0.15),
+          color: colorScheme.onSurface.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(6),
         ),
-        child: const Text('System', style: TextStyle(fontSize: 11, color: Colors.blueGrey, fontWeight: FontWeight.bold)),
+        child: Text(
+          'System',
+          style: TextStyle(
+            fontSize: 11,
+            color: colorScheme.onSurface.withValues(alpha: 0.6),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       );
     }
 
     if (isPaused) {
+      final bg = isDark ? const Color(0xFF3B2E0D) : const Color(0xFFFFF8E1);
+      final fg = isDark ? const Color(0xFFFFB74D) : const Color(0xFFE65100);
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: Colors.amber.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: const Text('PAUSED', style: TextStyle(fontSize: 11, color: Colors.amber, fontWeight: FontWeight.bold)),
+        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
+        child: Text('PAUSED', style: TextStyle(fontSize: 11, color: fg, fontWeight: FontWeight.bold)),
       );
     }
 
     if (isStreaming) {
+      final bg = isDark ? const Color(0xFF0D3B1A) : const Color(0xFFE8F5E9);
+      final fg = isDark ? const Color(0xFF66BB6A) : const Color(0xFF2E7D32);
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: Colors.green.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: const Row(
+        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.circle, color: Colors.green, size: 8),
-            SizedBox(width: 4),
-            Text('LIVE', style: TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.bold)),
+            Icon(Icons.circle, color: fg, size: 8),
+            const SizedBox(width: 4),
+            Text('LIVE', style: TextStyle(fontSize: 11, color: fg, fontWeight: FontWeight.bold)),
           ],
         ),
       );
@@ -557,10 +578,17 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.grey.withValues(alpha: 0.15),
+        color: colorScheme.onSurface.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(6),
       ),
-      child: const Text('OFFLINE', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
+      child: Text(
+        'OFFLINE',
+        style: TextStyle(
+          fontSize: 11,
+          color: colorScheme.onSurface.withValues(alpha: 0.45),
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 }
@@ -570,27 +598,43 @@ class _LogLineRow extends StatelessWidget {
 
   final LogEntry entry;
 
-  static const _monoStyle = TextStyle(fontFamily: 'monospace', fontSize: 11);
-  static const _monoSmallStyle = TextStyle(fontFamily: 'monospace', fontSize: 10);
-  static const _timestampStyle = TextStyle(fontFamily: 'monospace', fontSize: 11, color: Colors.grey);
-  static const _tagStyle = TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.w600, color: Colors.cyan);
-  static const _pidStyle = TextStyle(fontFamily: 'monospace', fontSize: 10, color: Colors.grey);
-  static const _separatorStyle = TextStyle(fontFamily: 'monospace', fontSize: 11, color: Colors.grey);
-
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
     final (badgeBg, badgeFg) = switch (entry.level) {
-      LogLevel.verbose => (Colors.grey.withValues(alpha: 0.15), Colors.grey),
-      LogLevel.debug => (Colors.teal.withValues(alpha: 0.15), Colors.teal),
-      LogLevel.info => (Colors.blue.withValues(alpha: 0.15), Colors.blue),
-      LogLevel.warning => (Colors.amber.withValues(alpha: 0.15), Colors.amber.shade800),
-      LogLevel.error || LogLevel.fatal => (Colors.red.withValues(alpha: 0.18), Colors.red.shade600),
+      LogLevel.verbose => (
+          colorScheme.onSurface.withValues(alpha: 0.08),
+          colorScheme.onSurface.withValues(alpha: 0.5),
+        ),
+      LogLevel.debug => (
+          isDark ? const Color(0xFF0D3B3B) : const Color(0xFFE0F2F1),
+          isDark ? const Color(0xFF4DB6AC) : const Color(0xFF00796B),
+        ),
+      LogLevel.info => (
+          isDark ? const Color(0xFF0D2B4B) : const Color(0xFFE3F2FD),
+          isDark ? const Color(0xFF64B5F6) : const Color(0xFF1565C0),
+        ),
+      LogLevel.warning => (
+          isDark ? const Color(0xFF3B2E0D) : const Color(0xFFFFF8E1),
+          isDark ? const Color(0xFFFFB74D) : const Color(0xFFE65100),
+        ),
+      LogLevel.error || LogLevel.fatal => (
+          isDark ? const Color(0xFF3B0D0D) : const Color(0xFFFFEBEE),
+          isDark ? const Color(0xFFEF5350) : const Color(0xFFC62828),
+        ),
     };
 
+    final tagColor = isDark ? const Color(0xFF4DB6AC) : const Color(0xFF00796B);
+    final timestampColor = colorScheme.onSurface.withValues(alpha: 0.45);
+    final pidColor = colorScheme.onSurface.withValues(alpha: 0.35);
+    final separatorColor = colorScheme.onSurface.withValues(alpha: 0.3);
+
     final messageColor = switch (entry.level) {
-      LogLevel.error || LogLevel.fatal => Colors.redAccent,
-      LogLevel.warning => Colors.orangeAccent,
-      _ => null,
+      LogLevel.error || LogLevel.fatal => isDark ? const Color(0xFFEF5350) : const Color(0xFFC62828),
+      LogLevel.warning => isDark ? const Color(0xFFFFB74D) : const Color(0xFFE65100),
+      _ => colorScheme.onSurface.withValues(alpha: 0.85),
     };
 
     return Padding(
@@ -599,7 +643,10 @@ class _LogLineRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (entry.timeFormatted != null) ...[
-            Text(entry.timeFormatted!, style: _timestampStyle),
+            Text(
+              entry.timeFormatted!,
+              style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: timestampColor),
+            ),
             const SizedBox(width: 8),
           ],
 
@@ -611,22 +658,22 @@ class _LogLineRow extends StatelessWidget {
             ),
             child: Text(
               entry.level.shortCode,
-              style: _monoSmallStyle.copyWith(fontWeight: FontWeight.bold, color: badgeFg),
+              style: TextStyle(fontFamily: 'monospace', fontSize: 10, fontWeight: FontWeight.bold, color: badgeFg),
             ),
           ),
           const SizedBox(width: 8),
 
           if (entry.tag != null && entry.tag!.isNotEmpty) ...[
-            Text(entry.tag!, style: _tagStyle),
+            Text(entry.tag!, style: TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.w600, color: tagColor)),
             if (entry.pid != null && entry.pid!.isNotEmpty)
-              Text('(${entry.pid})', style: _pidStyle),
-            const Text(': ', style: _separatorStyle),
+              Text('(${entry.pid})', style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: pidColor)),
+            Text(': ', style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: separatorColor)),
           ],
 
           Expanded(
             child: Text(
               entry.message,
-              style: messageColor != null ? _monoStyle.copyWith(color: messageColor) : _monoStyle,
+              style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: messageColor),
             ),
           ),
         ],
@@ -741,14 +788,17 @@ class _AppFilterBar extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Container(
-                          width: 7,
-                          height: 7,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: state.activeAppPid != null ? Colors.green : Colors.grey,
-                          ),
-                        ),
+                        Builder(builder: (context) {
+                          final isDk = Theme.of(context).brightness == Brightness.dark;
+                          final dotColor = state.activeAppPid != null
+                              ? (isDk ? const Color(0xFF66BB6A) : const Color(0xFF2E7D32))
+                              : colorScheme.onSurface.withValues(alpha: 0.35);
+                          return Container(
+                            width: 7,
+                            height: 7,
+                            decoration: BoxDecoration(shape: BoxShape.circle, color: dotColor),
+                          );
+                        }),
                         const SizedBox(width: 6),
                         Text(
                           state.selectedPackage!,
@@ -761,21 +811,26 @@ class _AppFilterBar extends StatelessWidget {
                         ),
                         if (state.activeAppPid != null) ...[
                           const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              'PID: ${state.activeAppPid}',
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
+                          Builder(builder: (context) {
+                            final isDk = Theme.of(context).brightness == Brightness.dark;
+                            final pidBg = isDk ? const Color(0xFF0D3B1A) : const Color(0xFFE8F5E9);
+                            final pidFg = isDk ? const Color(0xFF66BB6A) : const Color(0xFF2E7D32);
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: pidBg,
+                                borderRadius: BorderRadius.circular(4),
                               ),
-                            ),
-                          ),
+                              child: Text(
+                                'PID: ${state.activeAppPid}',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: pidFg,
+                                ),
+                              ),
+                            );
+                          }),
                         ],
                         const SizedBox(width: 4),
                         IconButton(
