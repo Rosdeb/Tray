@@ -84,7 +84,9 @@ However, to start an emulator or view device logs, developers are typically forc
   - **Process PID Filtering**: Matches all logs emitted from inside the app's process in real-time, including custom log tags, `print()`, native crashes, and network requests.
   - **Framework Presets**: Instant one-click filter modes for **Flutter / Dart** (`flutter`, `dart`, `flutter_engine`) and **React Native** (`ReactNative`, `ReactNativeJS`).
   - **Installed App Picker**: Choose from all installed third-party user applications on the device or manually enter any custom package name.
-- **Real-Time ADB Streaming**: Streams live logcat (`adb logcat -v time`) with high-throughput 60 FPS batched UI rendering.
+- **Real-Time ADB Streaming**: Streams live logcat (`adb logcat -v time`) with high-throughput 60 FPS batched UI rendering and automatic reconnection on stream drop.
+- **Open in External Terminal**: Launch logcat in a native Terminal (macOS) or Command Prompt (Windows) window with one click — streams app-filtered logs in a standalone terminal for side-by-side debugging.
+- **PID-Based Server-Side Filtering**: Uses `adb logcat --pid=<PID>` for reliable app-only log capture — same technique as Android Studio, ensuring no logs are missed.
 - **Instant Search & Level Filtering**:
   - Filter by log severity: `Verbose+`, `Debug+`, `Info+`, `Warning+`, `Error+`, and `Fatal`.
   - Search query filtering across message text, component tags, and process IDs (PID).
@@ -244,6 +246,25 @@ flutter analyze
 # Unit and widget test suite
 flutter test
 ```
+
+---
+
+## 📋 Changelog
+
+### v1.3.3 — Device Logs Overhaul
+- **Open Logcat in External Terminal**: New toolbar button launches real-time `adb logcat` in a native Terminal (macOS) or Command Prompt (Windows) window — get app-only logs in a standalone terminal alongside the in-app viewer.
+- **PID-Based Server-Side Filtering**: Uses `adb logcat --pid=<PID>` for reliable app-specific log isolation — same approach as Android Studio's logcat, no more missed logs from client-side filtering.
+- **Auto-Reconnect on Stream Drop**: Logcat stream automatically reconnects up to 5 times with exponential backoff when the device connection drops — no more stuck "OFFLINE" status.
+- **Theme-Aware Log Colors**: All log components (timestamps, tags, PIDs, level badges, messages, error banners, status indicators) now adapt properly to both dark and light themes with high-contrast readable colors.
+
+### v1.3.0 — UI/UX Modernization & Performance
+- **Professional Dark/Light Theme**: Complete theme redesign with Material 3 `ColorScheme.fromSeed`, custom surface colors, and comprehensive component theming (cards, inputs, buttons, dialogs, tooltips, scrollbars).
+- **9 Performance Fixes**: Cached hardware acceleration checks (eliminated subprocess every 5s), `.select()` optimizations to prevent unnecessary widget rebuilds, `IndexedStack` for tab state persistence, fixed sparkline `shouldRepaint` (was always true due to list reference equality), `RepaintBoundary` on log lines.
+- **5 Bug Fixes**: Fixed alpha values (`withValues(alpha: 4)` → `0.85`), fixed double-fire on setting switches, fixed branding from "Android Emulator Manager" to "Simulation Tray", fixed deprecated `Matrix4.scale` and `Switch.activeColor` APIs.
+- **Icon System Upgrade**: Replaced all CupertinoIcons with Iconsax throughout the entire app for a consistent modern icon set.
+- **Dependency Cleanup**: Removed `flutter_advanced_switch` — replaced with native `Switch.adaptive` to fix double-fire bug and reduce bundle size.
+- **Debounced Dashboard Search**: Search input uses `ValueNotifier` + `ValueListenableBuilder` to avoid full widget rebuilds on every keystroke.
+- **Responsive Dashboard Grid**: Stat grid adapts columns (5/3/2) based on window width via `LayoutBuilder`.
 
 ---
 
