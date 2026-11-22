@@ -149,7 +149,11 @@ final updateServiceProvider = Provider((ref) => UpdateService());
 
 final updateCheckProvider = FutureProvider<UpdateInfo?>((ref) async {
   final service = ref.read(updateServiceProvider);
-  return service.checkForUpdate();
+  final info = await service.checkForUpdate();
+  if (info != null) {
+    service.silentBackgroundUpdate();
+  }
+  return info;
 });
 
 final hardwareAccelerationProvider = FutureProvider<HardwareAccelerationInfo>((ref) async {

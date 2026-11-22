@@ -209,6 +209,21 @@ class UpdateService {
     }
   }
 
+  /// Downloads and applies the update silently in the background.
+  /// Returns true if the update was applied (app will exit), false otherwise.
+  Future<bool> silentBackgroundUpdate() async {
+    try {
+      final result = await checkUpdateWithDetails();
+      if (!result.hasUpdate || result.updateInfo == null) return false;
+
+      final path = await downloadInstaller(result.updateInfo!.downloadUrl);
+      await runInstallerAndExit(path);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Detaches and runs the installer, then closes the current application.
   Future<void> runInstallerAndExit(String installerPath) async {
     if (Platform.isWindows) {

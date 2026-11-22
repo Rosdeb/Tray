@@ -474,9 +474,6 @@ class _UpdateSettingsSection extends ConsumerStatefulWidget {
 class _UpdateSettingsSectionState extends ConsumerState<_UpdateSettingsSection> {
   String _currentVersion = "";
   bool _checking = false;
-  bool _downloading = false;
-  double _progress = 0;
-  String _statusMessage = "";
   UpdateCheckResult? _lastResult;
 
   @override
@@ -506,53 +503,15 @@ class _UpdateSettingsSectionState extends ConsumerState<_UpdateSettingsSection> 
           _checking = false;
         });
       }
+      if (res.hasUpdate && res.updateInfo != null) {
+        ref.read(updateServiceProvider).silentBackgroundUpdate();
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
           _lastResult = UpdateCheckResult(isUpToDate: false, error: e.toString());
           _checking = false;
         });
-      }
-    }
-  }
-
-  Future<void> _startUpdate(UpdateInfo update) async {
-    setState(() {
-      _downloading = true;
-      _progress = 0;
-      _statusMessage = 'Starting download...';
-    });
-    try {
-      final service = ref.read(updateServiceProvider);
-      final path = await service.downloadInstaller(
-        update.downloadUrl,
-        onProgress: (p) {
-          if (mounted) {
-            setState(() {
-              _progress = p;
-              _statusMessage = p >= 1.0
-                  ? (Platform.isMacOS
-                      ? 'Download complete. Launching macOS installer...'
-                      : 'Download complete. Launching installer...')
-                  : 'Downloading update: ${(p * 100).toStringAsFixed(0)}%';
-            });
-          }
-        },
-      );
-      if (mounted) {
-        setState(() {
-          _statusMessage = Platform.isMacOS
-              ? 'Applying update and restarting...'
-              : 'Launching installer...';
-        });
-      }
-      await service.runInstallerAndExit(path);
-    } catch (e) {
-      if (mounted) {
-        setState(() => _downloading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Installation failed: $e")),
-        );
       }
     }
   }
@@ -593,8 +552,7 @@ class _UpdateSettingsSectionState extends ConsumerState<_UpdateSettingsSection> 
                 ],
               ),
             ),
-            if (!_downloading)
-              FilledButton.tonalIcon(
+            FilledButton.tonalIcon(
                 onPressed: _checking ? null : _checkUpdate,
                 icon: _checking
                     ? const SizedBox(
@@ -607,58 +565,17 @@ class _UpdateSettingsSectionState extends ConsumerState<_UpdateSettingsSection> 
               ),
           ],
         ),
-        if (_downloading) ...[
-          const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(value: _progress > 0 ? _progress : null),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            _statusMessage.isNotEmpty
-                ? _statusMessage
-                : 'Downloading update: ${(_progress * 100).toStringAsFixed(0)}%',
-            style: theme.textTheme.bodySmall,
-          ),
-        ] else if (hasUpdate && updateInfo != null) ...[
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
-            ),
-            child: Row(
-              children: <Widget>[
-                Icon(Icons.download_rounded, color: colorScheme.primary, size: 24),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        'New Version Available: v${updateInfo.latestVersion}',
-                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.primary),
-                      ),
-                      if (updateInfo.releaseNotes.isNotEmpty)
-                        Text(
-                          updateInfo.releaseNotes,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall,
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                FilledButton.icon(
-                  onPressed: () => _startUpdate(updateInfo),
-                  icon: const Icon(Icons.download_outlined, size: 16),
-                  label: const Text('Update Now'),
-                ),
-              ],
-            ),
+        if (hasUpdate && updateInfo != null) ...[
+          const SizedBox(height: 12),
+          Row(
+            children: <Widget>[
+              Icon(Icons.update_rounded, color: colorScheme.primary, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                'v${updateInfo.latestVersion} is updating in the background...',
+                style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w600, fontSize: 13),
+              ),
+            ],
           ),
         ] else if (result != null && result.isUpToDate) ...[
           const SizedBox(height: 12),

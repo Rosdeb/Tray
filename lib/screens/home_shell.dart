@@ -8,7 +8,6 @@ import 'package:window_manager/window_manager.dart';
 import '../models/emulator.dart';
 import '../providers/app_providers.dart';
 import '../services/tray_service.dart';
-import '../services/update_service.dart';
 import '../widgets/wireless_connect_dialog.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'logs/logs_screen.dart';
@@ -142,32 +141,8 @@ class _HomeShellState extends ConsumerState<HomeShell>
   }
 
   Future<void> _handleManualUpdateCheck() async {
-    final notify = ref.read(notificationServiceProvider);
-    await notify.show("Simulation Tray", "Checking for updates...");
-
     ref.invalidate(updateCheckProvider);
-    final result = await ref.read(updateServiceProvider).checkUpdateWithDetails();
-
-    if (result.hasUpdate && result.updateInfo != null) {
-      await notify.show(
-        "Update Available!",
-        "Version v${result.updateInfo!.latestVersion} is ready to download. Open Simulation Tray to update.",
-      );
-      if (mounted) {
-        await windowManager.show();
-        await windowManager.focus();
-      }
-    } else if (result.isUpToDate) {
-      await notify.show(
-        "Up to Date",
-        "Simulation Tray v${result.currentVersion} is the latest version.",
-      );
-    } else if (result.hasError) {
-      await notify.show(
-        "Update Check Failed",
-        result.error ?? "Could not reach update server.",
-      );
-    }
+    await ref.read(updateServiceProvider).silentBackgroundUpdate();
   }
 
   @override
@@ -362,9 +337,7 @@ class VersionUpdateTile extends ConsumerStatefulWidget {
 
 class _VersionUpdateTileState extends ConsumerState<VersionUpdateTile> {
   String _currentVersion = "";
-  bool _downloading = false;
   bool _checking = false;
-  double _progress = 0;
 
   @override
   void initState() {
@@ -378,174 +351,67 @@ class _VersionUpdateTileState extends ConsumerState<VersionUpdateTile> {
   }
 
   Future<void> _manualCheck() async {
-    if (_checking || _downloading) return;
+    if (_checking) return;
     setState(() => _checking = true);
     try {
       ref.invalidate(updateCheckProvider);
-      final result = await ref.read(updateServiceProvider).checkUpdateWithDetails();
-      if (!mounted) return;
-      if (result.hasUpdate && result.updateInfo != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Update available: v${result.updateInfo!.latestVersion}"),
-            action: SnackBarAction(
-              label: "Install",
-              onPressed: () => _handleUpdate(result.updateInfo!),
-            ),
-          ),
-        );
-      } else if (result.isUpToDate) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Simulation Tray v${result.currentVersion} is up to date!")),
-        );
-      } else if (result.hasError) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Update check failed: ${result.error}")),
-        );
-      }
+      await ref.read(updateServiceProvider).silentBackgroundUpdate();
     } finally {
       if (mounted) setState(() => _checking = false);
     }
   }
 
-  Future<void> _handleUpdate(UpdateInfo update) async {
-    final service = ref.read(updateServiceProvider);
-
-    setState(() {
-      _downloading = true;
-      _progress = 0;
-    });
-
-    try {
-      final path = await service.downloadInstaller(
-        update.downloadUrl,
-        onProgress: (p) => setState(() => _progress = p),
-      );
-      await service.runInstallerAndExit(path);
-    } catch (e) {
-      setState(() => _downloading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Update failed: $e")),
-        );
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final updateAsync = ref.watch(updateCheckProvider);
+    ref.watch(updateCheckProvider);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          updateAsync.when(
-            data: (update) {
-              // Already latest version
-              if (update == null) {
-                return Tooltip(
-                  message: "Click to check for updates",
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: _manualCheck,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withValues(alpha: .12),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _checking
-                              ? const SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.green),
-                                )
-                              : const Icon(
-                                  Icons.check_circle_rounded,
-                                  size: 14,
-                                  color: Colors.green,
-                                ),
-                          const SizedBox(width: 6),
-                          Text(
-                            _checking
-                                ? "Checking..."
-                                : _currentVersion.isEmpty
-                                    ? "Up to date"
-                                    : "v$_currentVersion (Latest)",
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.green,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }
-
-              if (_downloading) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    LinearProgressIndicator(value: _progress),
-                    const SizedBox(height: 4),
-                    Text(
-                      "${(_progress * 100).toStringAsFixed(0)}%",
-                      style: const TextStyle(fontSize: 10),
-                    ),
-                  ],
-                );
-              }
-
-              return GestureDetector(
-                onTap: () => _handleUpdate(update),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.download_rounded,
+      child: Tooltip(
+        message: "Click to check for updates",
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: _manualCheck,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 8,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.green.withValues(alpha: .12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _checking
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.green),
+                      )
+                    : const Icon(
+                        Icons.check_circle_rounded,
                         size: 14,
-                        color: colorScheme.primary,
+                        color: Colors.green,
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        "Update to v${update.latestVersion}",
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: colorScheme.primary,
-                        ),
-                      ),
-                    ],
+                const SizedBox(width: 6),
+                Text(
+                  _checking
+                      ? "Checking..."
+                      : _currentVersion.isEmpty
+                          ? "Up to date"
+                          : "v$_currentVersion",
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.green,
                   ),
                 ),
-              );
-            },
-            loading: () => const SizedBox.shrink(),
-            error: (_, _) => const SizedBox.shrink(),
-          )
-
-        ],
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
