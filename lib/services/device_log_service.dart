@@ -41,7 +41,6 @@ class DeviceLogService {
         tag: tag,
         pid: pid,
         message: msg,
-        raw: trimmed,
       );
     }
 
@@ -51,7 +50,6 @@ class DeviceLogService {
         level: LogLevel.info,
         tag: 'system',
         message: trimmed,
-        raw: trimmed,
       );
     }
 
@@ -63,7 +61,6 @@ class DeviceLogService {
       tag: previous?.tag,
       pid: previous?.pid,
       message: trimmed,
-      raw: trimmed,
     );
   }
 
@@ -295,7 +292,7 @@ class DeviceLogService {
         // 3. App crash exception match (AndroidRuntime)
         if (entry.tag == 'AndroidRuntime' &&
             (entry.level == LogLevel.error || entry.level == LogLevel.fatal)) {
-          if (pid != null && pid.isNotEmpty && (entry.raw?.contains(pid) == true || entry.message.contains(pid))) {
+          if (pid != null && pid.isNotEmpty && entry.message.contains(pid)) {
             return true;
           }
           if (packageName != null && packageName.isNotEmpty && entry.message.toLowerCase().contains(packageName.toLowerCase())) {

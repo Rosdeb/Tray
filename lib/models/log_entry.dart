@@ -64,7 +64,6 @@ class LogEntry {
     required this.message,
     this.tag,
     this.pid,
-    this.raw,
     this.timeFormatted,
   });
 
@@ -73,6 +72,7 @@ class LogEntry {
   final String message;
   final String? tag;
   final String? pid;
-  final String? raw;
   final String? timeFormatted;
+
+  String get formatted => '${timeFormatted ?? ""} [${level.shortCode}] ${tag ?? ""}: $message';
 }

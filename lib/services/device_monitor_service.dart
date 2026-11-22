@@ -175,6 +175,19 @@ class DeviceMonitorService {
   int _prevDeviceTxBytes = -1;
   DateTime? _prevDeviceNetworkTime;
 
+  // Cached macOS FFI function pointers
+  late final _macDylib = Platform.isMacOS ? DynamicLibrary.process() : null;
+  late final _machHostSelf = _macDylib?.lookupFunction<IntPtr Function(), int Function()>('mach_host_self');
+  late final _hostStats = _macDylib?.lookupFunction<
+      Int32 Function(IntPtr, Int32, Pointer<Uint32>, Pointer<Uint32>),
+      int Function(int, int, Pointer<Uint32>, Pointer<Uint32>)>('host_statistics64');
+  late final _getifaddrs = _macDylib?.lookupFunction<
+      Int32 Function(Pointer<Pointer<_IfAddrs>>),
+      int Function(Pointer<Pointer<_IfAddrs>>)>('getifaddrs');
+  late final _freeifaddrs = _macDylib?.lookupFunction<
+      Void Function(Pointer<_IfAddrs>),
+      void Function(Pointer<_IfAddrs>)>('freeifaddrs');
+
   /// Resets deltas when switching targets
   void resetDeltas() {
     _prevHostRxBytes = -1;
@@ -732,19 +745,13 @@ class DeviceMonitorService {
   // macOS NATIVE FFI METHODS
   // ==========================================
   double _getMacCpuInstantaneous() {
-    final dylib = DynamicLibrary.process();
-    final machHostSelf = dylib.lookupFunction<IntPtr Function(), int Function()>('mach_host_self');
-    final hostStats = dylib.lookupFunction<
-        Int32 Function(IntPtr, Int32, Pointer<Uint32>, Pointer<Uint32>),
-        int Function(int, int, Pointer<Uint32>, Pointer<Uint32>)>('host_statistics64');
-
-    final host = machHostSelf();
+    final host = _machHostSelf!();
     final pCount = calloc<Uint32>();
     pCount.value = 4;
     final pInfo = calloc<_HostCpuLoadInfo>();
 
     try {
-      final ret = hostStats(host, 3, pInfo.cast<Uint32>(), pCount); // 3 = HOST_CPU_LOAD_INFO
+      final ret = _hostStats!(host, 3, pInfo.cast<Uint32>(), pCount); // 3 = HOST_CPU_LOAD_INFO
       if (ret != 0) return 0.0;
 
       final user = pInfo.ref.cpuTicks[0];
@@ -783,19 +790,13 @@ class DeviceMonitorService {
       totalRam = int.tryParse(sysctlRes.stdout.toString().trim()) ?? (16 * 1024 * 1024 * 1024);
     }
 
-    final dylib = DynamicLibrary.process();
-    final machHostSelf = dylib.lookupFunction<IntPtr Function(), int Function()>('mach_host_self');
-    final hostStats = dylib.lookupFunction<
-        Int32 Function(IntPtr, Int32, Pointer<Uint32>, Pointer<Uint32>),
-        int Function(int, int, Pointer<Uint32>, Pointer<Uint32>)>('host_statistics64');
-
-    final host = machHostSelf();
+    final host = _machHostSelf!();
     final pCount = calloc<Uint32>();
     pCount.value = 38; // HOST_VM_INFO64_COUNT
     final pInfo = calloc<_VmStatistics64>();
 
     try {
-      final ret = hostStats(host, 4, pInfo.cast<Uint32>(), pCount); // 4 = HOST_VM_INFO64
+      final ret = _hostStats!(host, 4, pInfo.cast<Uint32>(), pCount); // 4 = HOST_VM_INFO64
       if (ret != 0) return (totalRam, (totalRam * 0.5).toInt());
 
       const pageSize = 16384; // standard Apple Silicon page size (or 4096 on Intel)
@@ -810,17 +811,9 @@ class DeviceMonitorService {
   }
 
   (double, double) _getMacNetworkInstantaneous(DateTime now) {
-    final dylib = DynamicLibrary.process();
-    final getifaddrs = dylib.lookupFunction<
-        Int32 Function(Pointer<Pointer<_IfAddrs>>),
-        int Function(Pointer<Pointer<_IfAddrs>>)>('getifaddrs');
-    final freeifaddrs = dylib.lookupFunction<
-        Void Function(Pointer<_IfAddrs>),
-        void Function(Pointer<_IfAddrs>)>('freeifaddrs');
-
     final ppIfap = calloc<Pointer<_IfAddrs>>();
     try {
-      final ret = getifaddrs(ppIfap);
+      final ret = _getifaddrs!(ppIfap);
       if (ret != 0) return (0.0, 0.0);
 
       var cur = ppIfap.value;
@@ -857,7 +850,7 @@ class DeviceMonitorService {
       _prevHostTxBytes = curTx;
       _prevHostNetworkTime = now;
 
-      freeifaddrs(ppIfap.value);
+      _freeifaddrs!(ppIfap.value);
       return (rxSpeed, txSpeed);
     } finally {
       calloc.free(ppIfap);

@@ -184,8 +184,7 @@ void main() {
       level: LogLevel.error,
       tag: 'AndroidRuntime',
       pid: '5001',
-      message: 'FATAL EXCEPTION: main process com.example.myproject crash',
-      raw: 'FATAL EXCEPTION: main pid 5001',
+      message: 'FATAL EXCEPTION: main process com.example.myproject crash pid 5001',
     );
 
     test('LogFilterMode.all matches every entry', () {

@@ -873,9 +873,9 @@ class DeviceMonitorController extends Notifier<DeviceMonitorState> {
 
   static List<MetricDataPoint> _appendCapped(List<MetricDataPoint> list, MetricDataPoint item, int max) {
     if (list.length >= max) {
-      return [...list.sublist(1), item];
+      return List<MetricDataPoint>.of(list.skip(1), growable: true)..add(item);
     }
-    return [...list, item];
+    return List<MetricDataPoint>.of(list, growable: true)..add(item);
   }
 
   Future<void> tick() async {
@@ -1209,13 +1209,23 @@ class DeviceLogsController extends Notifier<DeviceLogsState> {
     _batchTimer = null;
     if (_pendingEntries.isEmpty) return;
 
-    final updated = List<LogEntry>.of(state.entries)..addAll(_pendingEntries);
-    _pendingEntries.clear();
+    final current = state.entries;
+    final totalNeeded = current.length + _pendingEntries.length;
 
-    if (updated.length > _maxEntries) {
-      updated.removeRange(0, updated.length - _maxEntries);
+    List<LogEntry> updated;
+    if (totalNeeded <= _maxEntries) {
+      updated = List<LogEntry>.of(current, growable: true)..addAll(_pendingEntries);
+    } else {
+      final skip = totalNeeded - _maxEntries;
+      updated = <LogEntry>[];
+      if (skip < current.length) {
+        updated.addAll(current.skip(skip));
+      }
+      final pendingSkip = skip > current.length ? skip - current.length : 0;
+      updated.addAll(_pendingEntries.skip(pendingSkip));
     }
 
+    _pendingEntries.clear();
     state = state.copyWith(entries: updated);
   }
 

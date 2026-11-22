@@ -183,7 +183,7 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
                           ? null
                           : () async {
                               final text = filtered
-                                  .map((e) => e.raw ?? '${e.timeFormatted ?? ""} [${e.level.shortCode}] ${e.tag ?? ""}: ${e.message}')
+                                  .map((e) => e.formatted)
                                   .join('\n');
                               await Clipboard.setData(ClipboardData(text: text));
                               if (context.mounted) {
